@@ -1,0 +1,85 @@
+#!/bin/bash
+
+# Usage: pb_php_compile in out
+
+scriptdir="$(dirname ${BASH_SOURCE[0]})" || exit 1
+
+include_path="$scriptdir/@rel_include_dir@"
+
+if ! @srcdir_equals_builddir@ ; then
+    # We are not building in the source tree
+    include_path="$include_path:@top_src_fullpath@/@rel_include_dir@"
+fi
+
+tmpheader="$(mktemp)"
+tmpout="$2"
+out="$2"
+# gen_file_str matches gen_file_str in pb_make.make
+gen_file_str="This is the generated file $2"
+
+case $2 in
+    *.html|*.php)
+        cat << END > "$tmpheader"
+<!DOCTYPE html>
+<html>
+<!-- $gen_file_str -->
+
+END
+        ;;
+    *.htm|*.ph|*.phd)
+        cat << END > "$tmpheader"
+<!-- Start: $gen_file_str -->
+
+END
+        ;;
+    *.js|*.css|*.jsp|*.cs)
+        cat << END > "$tmpheader"
+/* $gen_file_str */
+
+END
+    tmpout="${2}.tmp"
+        ;;
+
+    *)
+        echo "unknown file type for $2"  1>&2
+        exit 1
+        ;;
+esac
+
+function cleanup()
+{
+    rm -f "$tmpheader"
+    [ "$tmpout" != "$out" ] && rm -f "$tmpout"
+    [ "$1" = "0" ] || rm -f "$out"
+    exit $1
+}
+
+set -e
+#set -o pipefail
+
+cat "$tmpheader" $1 | sed -e 's/<?php\s*\/\*\s*server\s*\*\//<@php@/g' |\
+ @php_path@\
+ -d display_errors=stderr\
+ -d error_log=stderr\
+ -d "error_reporting=E_ALL|E_STRICT|E_NOTICE"\
+ -d "variables_order=ESCGP"\
+ -d "include_path=$include_path"\
+ -d "auto_prepend_file=$scriptdir/pb_auto_prepend.ph"\
+ -d "auto_append_file=$scriptdir/pb_auto_append.ph"\
+ -d "safe_mode_allowed_env_vars=PHP_"\
+ | sed -e 's/<@php@/<?php/g' > "$tmpout" || cleanup 1
+
+
+case $2 in
+    *.js|*.jsp)
+        @js_compile@ "$tmpout" > "$out" || cleanup 1
+        ;;
+    *.css|*.cs)
+        @css_compile@ "$tmpout" > "$out" || cleanup 1
+        ;;
+    *)
+    ;;
+esac
+
+cleanup 0
+

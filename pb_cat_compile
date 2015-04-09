@@ -1,0 +1,153 @@
+#!/usr/bin/ruby -w
+
+# Usage: pb_cat_compile in out
+
+require 'fileutils'
+
+
+$script_path = File.expand_path __FILE__
+$script_path.freeze
+
+$include_path = $scriptdir + '/@rel_include_dir@'
+
+unless ! @srcdir_equals_builddir@
+    # We are not building in the source tree
+    $include_path = $include_path +
+        ':@top_src_fullpath@/@rel_include_dir@'
+end
+
+if ARGV.length != 2
+    $stderr.print <<-END
+Usage: pb_cat_compile inFILE outFILE
+
+    END
+end
+
+$inpath = ARGV.shift
+$outpath = ARGV.shift
+
+
+def failure(err)
+
+    $stderr.print "pb_cat_compile #{$inpath} #{$outpath} FAILED\n"
+    $stderr.print err + "\n"
+    begin
+        throw
+    rescue
+        $stderr.print  $!.backtrace.to_s + "\n"
+    end
+    exit 1
+end
+
+$inpath = ARGV.shift
+$outpath = ARGV.shift
+
+def find_path(path)
+
+    return path if File.exist? path
+
+    ENV['PATH'].split(':').each do |d|
+        p =  d + '/' + path
+        if File.exist? p
+            return p
+            break
+        end
+    end
+
+    failure "Cannot find file " + path + " to include"    
+end
+
+$files = []
+
+def get_files(file)
+
+    path = find_path file
+
+    if file =~ /(\.ccss$|\.ccs$|\.cjs$|\.cjsp$|\.chtml$|\.chtm$|\.cphp$)/
+        File.open(path, 'r').each_line do |line|
+            line.strip!
+            get_files(find_path(line)) if line.length > 0 and line =~ /^[^#]/
+        end
+    elsif file =~ /(\.css$|\.cs$|\.js$|\.jsp$|\.txt$\.ht$|\.htm$|\.html$|\.ph$|\.phd$)/
+        $files.push path
+    else
+        failure file + " has unknown file type"
+    end
+end
+
+get_files $inpath
+
+$files.uniq!
+
+$yui = false
+
+if $outpath =~ /\.css$/ and not @debug@
+    $yui = '@css_compile@ > ' + $outpath
+    $out = IO.popen($yui, 'w')
+elsif $outpath =~ /\.js$/ and not @debug@
+    $yui = '@js_compile@ > ' + $outpath
+    $out = IO.popen($yui, 'w')
+else
+    $out = File.open($outpath, 'w')
+end
+
+
+if $outpath =~ /(\.html$|\.htm$)/ # .html .htm
+    $out.write <<-END
+<!DOCTYPE html>
+<html>
+<!-- This is a generated file from #{$inpath} -->
+
+    END
+    $files.each do |path|
+        $out.write "<!-- START FILE: #{path} -->\n" if @debug@
+        $out.write File.read(path)
+        $out.write "<!--   END FILE: #{path} -->\n" if @debug@
+    end
+    $out.write <<-END
+</html>
+
+    END
+elsif $outpath =~ /\.php$/ # .php
+    $out.write <<-END
+<?php /* This is a generated file from #{$inpath} */
+?>
+    END
+    $files.each do |path|
+        $out.write "<?php /* START FILE: #{path} */ ?>" if @debug@
+        $out.write File.read(path)
+        $out.write "<?php /*   END FILE: #{path} */ ?>" if @debug@
+    end
+elsif $outpath =~ /(\.cs$|\.css$|\.js$|\.jsp$)/ # .cs .css .js .jsp
+    $out.write <<-END
+/* This is a generated file from #{$inpath} */
+    END
+    $files.each do |path|
+        $out.write "/* START FILE: #{path} */" if @debug@
+        $out.write File.read(path)
+        $out.write "/*   END FILE: #{path} */" if @debug@
+    end
+else
+    failure 'unknown file type for output file ' + $outpath
+end
+
+$out.close
+
+
+if $yui and not $?.success?
+    failure 'Running "' + $yui + '" failed'
+end
+
+
+$out = File.open($outpath + '.d', 'w')
+$out.write <<END
+# This is a generated make depend file
+
+END
+$out.write $outpath + ':'
+$files.each do |f|
+    $out.write "\\\n" + f
+end
+$out.write "\n"
+$out.close
+
