@@ -98,11 +98,12 @@ fromsrc := $(strip\
  $(wildcard $(srcdir)/*.txt))
 installed_fromsrc :=
 ifneq ($(fromsrc),)
+  # String '@generated_file_string@' matches string
+  # put in files from pb_php_compile and pb_cat_compile
   define GET_fromsrc =
-    # gen_file_str matches gen_file_str in pb_php_compile
-    gen_file_str := This is the generated file $$(notdir $(1))
     installed_fromsrc := $$(installed_fromsrc) $$(shell\
-      if ! head -5 $(1) | grep -q '$$(gen_file_str)' ; then echo "$$(notdir $(1))"; fi)
+      if ! head -3 $(1) | grep -q '@generated_file_string@' ;\
+        then echo "$$(notdir $(1))"; fi)
   endef
 $(foreach f,$(fromsrc),$(eval $(call GET_fromsrc,$(f))))
 undefine GET_fromsrc
@@ -143,9 +144,8 @@ undefine dups
 undefine CHECK_dups
 
 
-clean_files := $(sort $(built))
-distclean_files := $(clean_files)\
- GNUmakefile
+clean_files := $(sort $(built) $(wildcard *.d))
+distclean_files := $(clean_files) GNUmakefile
 
 ifeq ($(strip $(top_builddir)),.)
 distclean_files := $(strip\
@@ -243,7 +243,7 @@ include $(wildcard *.d)
 %.cs: %.ccs
 	$(top_builddir)/pb_cat_compile $< $@
 %.gz: %
-	gzip -k -v $<
+	gzip -kf $<
 
 
 clean: $(clean_rec)
@@ -278,8 +278,6 @@ ifdef installed
 install: $(installed)
 endif
 $(install_rec): $(installed)
-
-
 
 
 # We check for sub directory make file removal as we recurse

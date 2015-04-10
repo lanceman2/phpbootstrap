@@ -45,11 +45,11 @@ clean distclean:
 ifneq ($(rm_dirs),)
 	rm -rf $(rm_dirs)
 endif
-ifneq ($(configure_files),)
-	rm $(configure_files)
-endif
 ifneq ($(made_dirs),)
 	for d in $(made_dirs) ; do make -C $$d distclean ; done
+endif
+ifneq ($(configure_files),)
+	rm $(configure_files)
 endif
 ifeq ($(strip $(rm_dirs) $(made_dirs) $(configure_files)),)
 	@echo "Nothing to clean."

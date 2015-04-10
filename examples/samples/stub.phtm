@@ -1,0 +1,16 @@
+<?php
+
+    require_once 'page.ph'
+?>
+<?php 
+    page_header();
+    echo <<<END
+  <h2>This is a h2 header</h2>
+
+END;
+
+
+?>
+
+
+</body>

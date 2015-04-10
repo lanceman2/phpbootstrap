@@ -12,55 +12,53 @@ if ! @srcdir_equals_builddir@ ; then
 fi
 
 tmpheader="$(mktemp)"
+in="$1"
 tmpout="$2"
 out="$2"
-# gen_file_str matches gen_file_str in pb_make.make
-gen_file_str="This is the generated file $2"
+
+# magic string used in pb_make.make and pb_cat_compile too
+gen_file_str="@generated_file_string@ from $1"
 
 case $2 in
-    *.html|*.php)
-        cat << END > "$tmpheader"
-<!DOCTYPE html>
-<html>
-<!-- $gen_file_str -->
-
-END
+    *.html)
+        tmpout="${2}.tmp"
         ;;
-    *.htm|*.ph|*.phd)
-        cat << END > "$tmpheader"
-<!-- Start: $gen_file_str -->
-
-END
+    *.ph|*.phd|*.php)
+        echo -en "<?php /* $gen_file_str */\n?>" > "$tmpheader"
+        ;;
+    *.htm)
+        echo "<!-- $gen_file_str -->" > "$tmpheader"
         ;;
     *.js|*.css|*.jsp|*.cs)
-        cat << END > "$tmpheader"
-/* $gen_file_str */
-
-END
-    tmpout="${2}.tmp"
+        echo "/* $gen_file_str */" > "$tmpheader"
+        tmpout="${2}.tmp"
         ;;
-
     *)
         echo "unknown file type for $2"  1>&2
         exit 1
         ;;
 esac
 
+
 function cleanup()
 {
     rm -f "$tmpheader"
     [ "$tmpout" != "$out" ] && rm -f "$tmpout"
-    [ "$1" = "0" ] || rm -f "$out"
+    if [ "$1" = 1 ] ; then
+        rm -f "$out"
+        echo "$0 failed" 1>&2
+    #else
+    #    echo "$0 succeeded" 1>&2
+    fi
     exit $1
 }
 
 set -e
-#set -o pipefail
+set -o pipefail
 
-cat "$tmpheader" $1 | sed -e 's/<?php\s*\/\*\s*server\s*\*\//<@php@/g' |\
+cat "$tmpheader" $in | sed -e 's/<?php\s*\/\*\s*server\s*\*\//<@php@/g' |\
  @php_path@\
  -d display_errors=stderr\
- -d error_log=stderr\
  -d "error_reporting=E_ALL|E_STRICT|E_NOTICE"\
  -d "variables_order=ESCGP"\
  -d "include_path=$include_path"\
@@ -77,8 +75,21 @@ case $2 in
     *.css|*.cs)
         @css_compile@ "$tmpout" > "$out" || cleanup 1
         ;;
+    *.html)
+        l="$(head -1 $tmpout)" || cleanup 1
+        if [[ "$l" =~ '<!DOCTYPE' ]] ; then
+            # first line
+            echo "$l" > "$out"
+            echo "<!-- $gen_file_str -->" >> "$out"
+            # the rest of it
+            sed -n '2,1000000p' $tmpout >> "$out"
+        else
+            echo "<!-- $gen_file_str -->" > "$out"
+            cat $tmpout >> "$out"
+        fi
+        ;;
     *)
-    ;;
+        ;;
 esac
 
 cleanup 0

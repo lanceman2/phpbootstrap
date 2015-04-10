@@ -1,5 +1,6 @@
 <?php /**pb_auto_append.ph**/
 
 
-?><!-- pb_auto_append --><?php
+//fwrite($stderr, "  PHP sourced: ". __FILE__."\n");
+
 ?>

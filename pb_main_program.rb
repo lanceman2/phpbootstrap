@@ -133,6 +133,7 @@ begin
   pkg = #{conf[:sub].to_s}
 
   fin.each_line do |line|
+    # this needs to match code at xxZZconf in pb_main_program.rb
     pkg.each do |k,v|
         if v.instance_of? String
             val = v
@@ -179,11 +180,11 @@ def gen_pb_file(name, data)
 
     path =  Dir.pwd + '/' + name
     print_gen path
-    p = IO.popen('./pb_config - ' + path, 'w')
+    p = File.open(path, 'w')
     p.write data
     p.close
-    exit 1 unless $?.success?
 end
+
 
 # buildpath is the dir where to write GNUmakefile
 # top_builddir is a relative path like . or .. or ../..
@@ -297,6 +298,25 @@ test__subdirs_FASDiefjmzzz:
 
 end
 
+def sub_line(pkg, line)
+
+    # this needs to match code at xxZZconf in this file
+    pkg.each do |k,v|
+        if v.instance_of? String
+            val = v
+        elsif v.instance_of? Array
+            if v[0].instance_of? String
+                val = v[0]
+            else
+                val = ((v[0])?'1':'0')
+            end
+        else
+            val = ((v)?'1':'0')
+        end
+        line.gsub!('@' + k.to_s + '@', val)
+    end
+    line
+end
 
 def configure (conf)
 
@@ -322,7 +342,7 @@ def configure (conf)
             line =~ /^<\?php \/\*\*pb_auto_append\.ph\*\*\//)
             data[i += 1] += "<?php /*** This is a generated file ***/\n"
         elsif i >= 0 and i <= 4
-            data[i] += line
+            data[i] += sub_line(conf[:sub], line)
         else
             $stderr.print "Code error reading DATA in #{__FILE__}\n"
             exit 1
@@ -499,6 +519,7 @@ def parse_args
         ' --type css --line-break 50' unless conf[:sub][:css_compile]
 
     conf[:sub][:debug] = 'true' unless conf[:sub][:debug]
+    conf[:sub][:generated_file_string] = 'This is a generated file'
 
     conf
 end
