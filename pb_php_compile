@@ -56,6 +56,8 @@ function cleanup()
 set -e
 set -o pipefail
 
+export PHP_OUTFILENAME="$out"
+
 cat "$tmpheader" $in | sed -e 's/<?php\s*\/\*\s*server\s*\*\//<@php@/g' |\
  @php_path@\
  -d display_errors=stderr\

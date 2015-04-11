@@ -1,3 +1,4 @@
+# END_CONFIGURATION
 
 require 'fileutils'
 
@@ -22,15 +23,8 @@ end
 
 if File.basename($script_path) == 'phpbootstrap'
 
-    arg = ARGV.shift
-
-    while arg
-        case arg
-        when /(--version|-V)/
-            puts $pb_version
-            exit
-        else
-            puts <<-END
+    def usage
+        puts <<-END
   Usage: phpbootstrap [-h|--help]|[-V|--version]
 
   Generate a phpbootstrap configure and other scripts.
@@ -38,36 +32,81 @@ if File.basename($script_path) == 'phpbootstrap'
   
       OPTIONS
 
-        -h|--help      print this help and exit
+        -h|--help            print this help and exit
 
-        -V|--version   print the phpbootstrap version (#{$pb_version})
-                       and exit
+        -V|--version         print the phpbootstrap version (#{$pb_version}) and exit
 
-            END
+        --name PACKAGE_NAME  set the package name to PACKAGE_NAME, the default is the
+                             current directory file name
+
+        END
+        exit
+    end
+
+    arg = ARGV.shift
+    package_name = File.basename Dir.pwd
+
+    while arg
+        case arg
+        when /(--version|-V)/
+            puts $pb_version
             exit
+        when /--name=/
+            package_name = arg.sub(/--name=/, '')
+        when /^--name$/
+            usage if not (arg = ARGV.shift)
+             package_name = arg
+        else
+            usage
         end
     end
 
-    ##########################################
-    # This script copies itself to configure #
-    ##########################################
+    package_name.gsub!(/[^a-zA-Z0-9_]/, '')
+
+    ##############################################################
+    # This script copies itself to configure with some additions #
+    ##############################################################
 
     print_gen Dir.pwd + '/configure'
-    FileUtils.copy $script_path, 'configure'
+    rd = File.open($script_path, 'r')
+    wr = File.open('configure', 'w')
+    wr.write rd.gets # get the #! line
+    wr.write <<-END
+#
+#####################################################
+# This file was generated when phpbootstrap ran
+#####################################################
+# pb_package_name was defined when phpbootstrap ran
+$pb_package_name = '#{package_name}'
+
+# END_CONFIGURATION
+    END
+    while line = rd.gets
+        break if line =~ /^# END_CONFIGURATION/
+    end
+    while line = rd.gets
+        wr.write line
+    end
+    wr.close
+    rd.close
+    FileUtils.chmod 0755, 'configure'
     exit 0
 end
 
 
-def dumpFile(in_path, out_file, required = true)
+def dumpFile(in_path, out_file, conf, required = true)
 
     if required or File.exist? in_path
         out_file.print '#>>>>> BEGIN FILE: ' + in_path + "\n"
-        $pkg.sub_strings(in_path, out_file)
+        File.open(in_path, 'r').each_line do |line|
+            out_file.print sub_line(conf[:sub], line)
+        end
         out_file.print '#<<<<< END   FILE: ' + in_path + "\n"
     else
         out_file.print "\n# no file: " + in_path + " to add\n\n"
     end
 end
+
 
 def gen_pb_config(conf)
 
@@ -87,11 +126,10 @@ def usage
 
 puts <<EEND
 
-  Usage: #{$0} INFILE OUTFILE
+  Usage: pb_config INFILE OUTFILE
 
   Subsitute @strings@ in INFILE and create OUTFILE.
-  If INFILE is '-' use stdin.  If OUTFILE is '-' use
-  stdout.
+  If INFILE is '-' use stdin.
 
 EEND
 exit 1
@@ -109,30 +147,30 @@ else
   fin = File.open(ARGV[0], 'r')
 end
 
-if ARGV[1] == '-'
-  out = $stdout
-  outpath = nil
-else
-  out = File.open(ARGV[1], 'w')
-  outpath = ARGV[1]
-end
+out = File.open(ARGV[1], 'w')
+outpath = ARGV[1]
+
 
 begin
 
-  if outpath
-    suffix = outpath.gsub(/^.*\./,'')
-    if suffix =~ /(ht|htm|html|php|phtml|ph|phd)/
-      out.write "<!-- This is a generated file -->\\n"
-    elsif suffix =~ /(js|jsp|css|cs)/
-      out.write "/* This is a generated file */\\n"
-    else # for bash script file
-      FileUtils.chmod 0755, outpath
+  # pkg is how this "#{File.basename(Dir.pwd)}" package is configured
+  pkg = {
+  END
+  
+    got = false
+    conf[:sub].each do |k,v|
+        f.print ",\n" if got
+        got = true
+        val = v.to_s
+        val = "'" + v + "'" if v.instance_of? String
+        f.print "    :#{k.to_s} => #{val}"
     end
-  end
+  
+    f.print <<-END
 
-  pkg = #{conf[:sub].to_s}
+  }
 
-  fin.each_line do |line|
+  def sub_line(pkg, line, out)
     # this needs to match code at xxZZconf in pb_main_program.rb
     pkg.each do |k,v|
         if v.instance_of? String
@@ -141,14 +179,45 @@ begin
             if v[0].instance_of? String
                 val = v[0]
             else
-                val = ((v[0])?'1':'0')
+                val = ((v[0])?'true':'false')
             end
         else
-            val = ((v)?'1':'0')
+            val = ((v)?'true':'false')
         end
         line.gsub!('@' + k.to_s + '@', val)
     end
     out.write line
+  end
+
+
+  l = fin.gets
+
+  if outpath
+    suffix = outpath.gsub(/^.*\\./, '')
+    if suffix == 'html' and l =~ /^<!DOCTYPE /
+      sub_line(pkg, l, out)
+      out.write "<!-- \#{pkg[:generated_file_string]} -->\\n"
+    elsif suffix =~ /^(ht|htm|html|php|phtml|ph|phd)$/
+      out.write "<!-- \#{pkg[:generated_file_string]} -->\\n"
+      sub_line(pkg, l, out) if l
+    elsif suffix =~ /^(js|jsp|css|cs)$/
+      out.write "/* \#{pkg[:generated_file_string]} */\\n"
+      sub_line(pkg, l, out) if l
+    elsif suffix == 'txt'
+      sub_line(pkg, l, out)
+    else # for bash script file
+      FileUtils.chmod 0755, outpath
+      if l
+        sub_line(pkg, l, out)
+      else
+        out.write "#!/bin/bash\n"
+      end
+      out.write "\n# \#{pkg[:generated_file_string]}\\n\\n"
+    end
+  end
+
+  while l = fin.gets
+    sub_line(pkg, l, out)
   end
 
 rescue Exception => e
@@ -157,7 +226,7 @@ rescue Exception => e
     # It's all or nothing.
     out.close
     # remove the file that we just made.
-    FileUtils.unlink outpath
+    FileUtils.rm_f outpath
     $stderr.print "writing " + outpath + " failed\\n"
     $stderr.print e.message  
     $stderr.print e.backtrace.inspect
@@ -189,7 +258,7 @@ end
 # buildpath is the dir where to write GNUmakefile
 # top_builddir is a relative path like . or .. or ../..
 # rel_srcdir is path relative to the top source dir like foo/bar
-def print_make_file(buildpath, conf, top_builddir, rel_srcdir)
+def print_make_file(buildpath, conf, top_builddir, rel_srcdir, data)
 
     unless File.exist? buildpath
         $stderr.print 'making directory: ' + buildpath + "/\n"
@@ -237,10 +306,10 @@ VPATH := #{vpath}
 
     END
 
-    bp_make_path = srcdir + '/bp.make'
-    dumpFile(bp_make_path, f, false)
+    bp_make_path = srcdir + '/pb.make'
+    dumpFile(bp_make_path, f, conf, false)
 
-    f.write $makefile_DATA
+    f.write data
     f.close
 
     subdirs = []
@@ -251,7 +320,7 @@ VPATH := #{vpath}
         f = File.open(gpath, "w")
         f.write <<-END
 # Temporary GNU makefile used to get value of SUBDIRS
-include #{from_dir + '/qb.make'}
+include #{bp_make_path}
 undefine build
 ifeq ($(strip $(SUBDIRS)),)
 SUBDIRS :=
@@ -262,14 +331,18 @@ test__subdirs_FASDiefjmzzz:
         f.close
         #$stderr.print "running: make test__subdirs_FASDiefjmzzz --silent\n"
         pwd = Dir.pwd
-        Dir.chdir to_pwd
+        Dir.chdir buildpath
         subdirs = %x[make test__subdirs_FASDiefjmzzz --silent -f #{gpath}].split
         # bug check
         if subdirs =~ /Entering directory/
             $stderr.print "running make spewed badly again\n"
             exit 1
+        elsif not $?.success?
+            $stderr.print "running make failed\n"
+            exit 1
         end
-        File.unlink gpath unless exists
+
+        File.unlink gpath
         ##$stderr.print 'subdirs ="' + subdirs.to_s + "\"\n"
         Dir.chdir pwd
     end
@@ -293,7 +366,7 @@ test__subdirs_FASDiefjmzzz:
         else
             rel = dir
         end
-        print_make_file(bld, conf, top_builddir, rel)
+        print_make_file(bld, conf, top_builddir, rel, data)
     end
 
 end
@@ -308,10 +381,10 @@ def sub_line(pkg, line)
             if v[0].instance_of? String
                 val = v[0]
             else
-                val = ((v[0])?'1':'0')
+                val = ((v[0])?'true':'false')
             end
-        else
-            val = ((v)?'1':'0')
+        else # boolean
+            val = ((v)?'true':'false')
         end
         line.gsub!('@' + k.to_s + '@', val)
     end
@@ -319,8 +392,6 @@ def sub_line(pkg, line)
 end
 
 def configure (conf)
-
-    conf.each { |k,v| puts k.to_s + " = " + v.to_s }
 
     gen_pb_config conf
 
@@ -349,9 +420,8 @@ def configure (conf)
         end
     end
 
-    $makefile_DATA = data[0]
 
-    print_make_file('.', conf, '.', '.')
+    print_make_file('.', conf, '.', '.', data[0])
 
     gen_pb_file('pb_php_compile', data[1])
     File.chmod(0755, 'pb_php_compile')
@@ -408,13 +478,14 @@ def usage
 
                  OPTIONS
 
-  --help|-h          print this help and exit
+  --help|-h           print this help and exit
 
-  --version|-V       print the phpbootstrap version number (#{$pb_version}) and exit.
+  --version|-V        print the phpbootstrap version number (#{$pb_version}) and exit.
 
-  --public PUBLIC    full path prefix to installed files that are web accessible
+  --public PUBLIC     full path prefix to installed files that are web accessible
 
-  --private PRIVATE  full path prefix to installed files that are not web accessible
+  --private PRIVATE   full path prefix to installed files that are not web accessible
+  --debug true|false  make it a debug build, i.e. not production, or not
 
 
 END
@@ -462,6 +533,8 @@ def parse_args
     conf[:sub][:yui_path] = which 'yui'
     conf[:sub][:js_compile] = false
     conf[:sub][:css_compile] = false
+    # default debug value # TODO change this
+    conf[:sub][:debug] = true
 
     conf[:public] = Dir.pwd + '/testPublic'
     conf[:private] = Dir.pwd + '/testPrivate'
@@ -476,6 +549,13 @@ def parse_args
             conf[:private] = File.expand_path ret
         elsif ret = check_arg('--private', arg)
             conf[:private] = File.expand_path ret
+        elsif ret = check_arg('--debug', arg)
+            ret.downcase!
+            if conf[:sub][:debug] # default is true
+                conf[:sub][:debug] = 'false' if ret =~ /(^n|^f|^0|^of)/
+            else
+                conf[:sub][:debug] = 'true' if ret =~ /(^y|^t|^[1-9]|^on|^al)/
+            end
         else
             usage
         end
@@ -511,7 +591,7 @@ def parse_args
     # building include path relative to top source dir
     conf[:sub][:rel_include_dir] = 'bld_include'
     conf[:sub][:top_src_fullpath] = conf[:top_src_fullpath]
-    conf[:sub][:srcdir_equals_builddir] = conf[:srcdir_equals_builddir].to_s
+    conf[:sub][:srcdir_equals_builddir] = conf[:srcdir_equals_builddir]
 
     conf[:sub][:js_compile] = conf[:sub][:yui_path] +\
         ' --type js --line-break 50' unless conf[:sub][:js_compile]
@@ -520,6 +600,7 @@ def parse_args
 
     conf[:sub][:debug] = 'true' unless conf[:sub][:debug]
     conf[:sub][:generated_file_string] = 'This is a generated file'
+    conf[:sub][:package_name] = $pb_package_name
 
     conf
 end

@@ -121,7 +121,7 @@ ifndef srcdir_equals_builddir
 endif
 
 
-built_uncompressed = $(strip $(built_php) $(built_cat) $(built_md_html))
+built_uncompressed = $(strip $(built_php) $(built_cat) $(built_md_html) $(built_in_any))
 built_gzip_gz = $(addsuffix .gz,\
  $(filter-out %.cs %.jsp, $(built_uncompressed) $(installed_fromsrc)))
 
@@ -171,7 +171,6 @@ undefine installed
 endif
 
 
-
 .DEFAULT_GOAL = build
 
 #####################################################################
@@ -186,7 +185,7 @@ endif
  build clean _debug distclean install _debug_norec $(install) all
 
 .SUFFIXES:
-.SUFFIXES: .md .html .htm .html .php .ph .phd .css .js .in .d .gz\
+.SUFFIXES: .md .html .htm .html .php .ph .phd .css .js .gz\
  .pphp .phtml .phtm .pjs .pcss .cphp .chtml .chtm .cjs .ccss .txt\
  .jsp .cs .ht .ph .phd .cjsp .ccs
 
@@ -194,6 +193,15 @@ endif
 .INTERMEDIATE:
 
 .SECONDARY:
+
+
+define MAKE_in_rules =
+  $(1): $(1).in
+	$(top_builddir)/pb_config $(srcdir)/$(1).in $(1)
+endef
+$(foreach suf,$(built_in_any),$(eval $(call MAKE_in_rules,$(suf))))
+undefine MAKE_in_rules
+
 
 
 # remove some GNU make implicit rules
@@ -210,8 +218,6 @@ include $(wildcard *.d)
 
 
 # generic suffix rules
-%: %.in
-	$(top_builddir)/pb_config $< $@
 %.html: %.md
 	marked $< > $@
 %.php: %.pphp

@@ -90,7 +90,7 @@ $yui = false
 # generate make depend file
 $out = File.open($outpath + '.d', 'w')
 $out.write <<END
-# generated make depend file
+# this is a generated make depend file
 
 END
 $out.write $outpath + ':'
@@ -99,8 +99,6 @@ $files.each do |f|
 end
 $out.write "\n"
 $out.close
-
-
 
 
 if $outpath =~ /\.css$/ and not @debug@

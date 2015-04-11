@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>@package_name@ test_in</title>
+</head>
+<body>
+    <h1>package name = @package_name@</h1>
+</body>
+</html>

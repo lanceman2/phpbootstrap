@@ -1,0 +1,5 @@
+    <h1>package name = @package_name@</h1>
+
+  <p>
+  We configured this @package_name@ package with debug = @debug@.
+  </p>
