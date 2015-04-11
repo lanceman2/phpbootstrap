@@ -6,7 +6,12 @@ require 'fileutils'
 $script_path = File.expand_path __FILE__
 $script_path.freeze
 
-######################################################################
+# Every file that we generate gets this, generated_file_magic_string, in
+# it at or close to the top in a comment.
+$generated_file_magic_string = 'phpbootstrap: This is a generated file'
+$generated_file_magic_string.freeze
+
+########################################################################
 
 
 def print_gen(path)
@@ -72,7 +77,7 @@ if File.basename($script_path) == 'phpbootstrap'
     wr = File.open('configure', 'w')
     wr.write rd.gets # get the #! line
     wr.write <<-END
-#
+# #{$generated_file_magic_string}
 #####################################################
 # This file was generated when phpbootstrap ran
 #####################################################
@@ -110,17 +115,17 @@ end
 
 def gen_pb_config(conf)
 
-    path = Dir.pwd + '/pb_config'
+    path = Dir.pwd + '/' + conf[:sub][:pb_build_prefix] + 'pb_config'
     print_gen path
     f = File.open(path , 'w')
     f.print <<-END
 #!/usr/bin/ruby -w
-######################################
-###### This is a generated file ######
-######################################
-
+#############################################
+###### #{conf[:sub][:generated_file_string]}
+#############################################
 
 require 'fileutils'
+
 
 def usage
 
@@ -194,16 +199,20 @@ begin
 
   if outpath
     suffix = outpath.gsub(/^.*\\./, '')
-    if suffix == 'html' and l =~ /^<!DOCTYPE /
+    if suffix =~ /^(ht|thm|html)$/ and l =~ /^<!DOCTYPE /
       sub_line(pkg, l, out)
       out.write "<!-- \#{pkg[:generated_file_string]} -->\\n"
-    elsif suffix =~ /^(ht|htm|html|php|phtml|ph|phd)$/
+    elsif suffix =~ /^(ht|htm|html)$/
       out.write "<!-- \#{pkg[:generated_file_string]} -->\\n"
+      sub_line(pkg, l, out) if l
+    elsif suffix =~ /^(php|phtml|ph|phd)$/
+      out.write "<?php\\n/* \#{pkg[:generated_file_string]}*/\\n ?>"
       sub_line(pkg, l, out) if l
     elsif suffix =~ /^(js|jsp|css|cs)$/
       out.write "/* \#{pkg[:generated_file_string]} */\\n"
       sub_line(pkg, l, out) if l
     elsif suffix == 'txt'
+      out.write "\# \#{pkg[:generated_file_string]}\\n"
       sub_line(pkg, l, out)
     else # for bash script file
       FileUtils.chmod 0755, outpath
@@ -245,9 +254,9 @@ end
 
 
 
-def gen_pb_file(name, data)
+def gen_pb_file(name, data, conf)
 
-    path =  Dir.pwd + '/' + name
+    path =  Dir.pwd + '/' + conf[:sub][:pb_build_prefix] + name
     print_gen path
     p = File.open(path, 'w')
     p.write data
@@ -292,7 +301,7 @@ def print_make_file(buildpath, conf, top_builddir, rel_srcdir, data)
     print_gen path
     f = File.open(path , 'w')
     f.print <<-END
-#This is a generated file
+# #{conf[:sub][:generated_file_string]}
 
 top_builddir := #{top_builddir}
 
@@ -393,6 +402,15 @@ end
 
 def configure (conf)
 
+    if conf[:sub][:pb_build_prefix] and
+        conf[:sub][:pb_build_prefix].length > 0
+        pb_bld_dir = Dir.pwd + '/' + conf[:sub][:pb_build_prefix]
+        if not File.exist? pb_bld_dir
+            $stderr.print "    creating: #{pb_bld_dir}\n"
+            FileUtils.mkdir_p pb_bld_dir
+        end
+    end
+
     gen_pb_config conf
 
     data = ['','','','','']
@@ -404,14 +422,14 @@ def configure (conf)
             data[i += 1] += <<-END
 #{line}
 ############################
-# This is a generated file
+# #{conf[:sub][:generated_file_string]}
 ############################
 
             END
         elsif i >= 2 and i < 4 and
             (line =~ /^<\?php \/\*\*pb_auto_prepend\.ph\*\*\// or\
             line =~ /^<\?php \/\*\*pb_auto_append\.ph\*\*\//)
-            data[i += 1] += "<?php /*** This is a generated file ***/\n"
+            data[i += 1] += "<?php /*** #{conf[:sub][:generated_file_string]} ***/\n"
         elsif i >= 0 and i <= 4
             data[i] += sub_line(conf[:sub], line)
         else
@@ -423,15 +441,15 @@ def configure (conf)
 
     print_make_file('.', conf, '.', '.', data[0])
 
-    gen_pb_file('pb_php_compile', data[1])
-    File.chmod(0755, 'pb_php_compile')
+    gen_pb_file('pb_php_compile', data[1], conf)
+    File.chmod(0755, conf[:sub][:pb_build_prefix] + 'pb_php_compile')
 
-    gen_pb_file('pb_cat_compile', data[2])
-    File.chmod(0755, 'pb_cat_compile')
+    gen_pb_file('pb_cat_compile', data[2], conf)
+    File.chmod(0755, conf[:sub][:pb_build_prefix] + 'pb_cat_compile')
 
-    gen_pb_file('pb_auto_prepend.ph', data[3].strip!)
+    gen_pb_file('pb_auto_prepend.ph', data[3].strip!, conf)
 
-    gen_pb_file('pb_auto_append.ph', data[4].strip!)
+    gen_pb_file('pb_auto_append.ph', data[4].strip!, conf)
 
 end
 
@@ -589,7 +607,6 @@ def parse_args
     end
 
     # building include path relative to top source dir
-    conf[:sub][:rel_include_dir] = 'bld_include'
     conf[:sub][:top_src_fullpath] = conf[:top_src_fullpath]
     conf[:sub][:srcdir_equals_builddir] = conf[:srcdir_equals_builddir]
 
@@ -599,9 +616,11 @@ def parse_args
         ' --type css --line-break 50' unless conf[:sub][:css_compile]
 
     conf[:sub][:debug] = 'true' unless conf[:sub][:debug]
-    conf[:sub][:generated_file_string] = 'This is a generated file'
+    conf[:sub][:generated_file_string] = $generated_file_magic_string
     conf[:sub][:package_name] = $pb_package_name
-
+    conf[:sub][:pb_build_prefix] = 'pb_build/'
+    #conf[:sub][:pb_build_prefix] = ''
+    conf[:sub][:rel_include_dir] = 'bld_include'
     conf
 end
 

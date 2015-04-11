@@ -4,7 +4,7 @@
 
 scriptdir="$(dirname ${BASH_SOURCE[0]})" || exit 1
 
-include_path="$scriptdir/@rel_include_dir@"
+include_path="@rel_include_dir@"
 
 if ! @srcdir_equals_builddir@ ; then
     # We are not building in the source tree
@@ -20,14 +20,11 @@ out="$2"
 gen_file_str="@generated_file_string@ from $1"
 
 case $2 in
-    *.html)
+    *.html|*.htm)
         tmpout="${2}.tmp"
         ;;
     *.ph|*.phd|*.php)
         echo -en "<?php /* $gen_file_str */\n?>" > "$tmpheader"
-        ;;
-    *.htm)
-        echo "<!-- $gen_file_str -->" > "$tmpheader"
         ;;
     *.js|*.css|*.jsp|*.cs)
         echo "/* $gen_file_str */" > "$tmpheader"
@@ -77,7 +74,7 @@ case $2 in
     *.css|*.cs)
         @css_compile@ "$tmpout" > "$out" || cleanup 1
         ;;
-    *.html)
+    *.html|*.htm)
         l="$(head -1 $tmpout)" || cleanup 1
         if [[ "$l" =~ '<!DOCTYPE' ]] ; then
             # first line

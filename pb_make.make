@@ -88,6 +88,7 @@ built_md_html = $(sort \
  $(patsubst $(srcdir)/%.md.in, %.html, $(wildcard $(srcdir)/*.md.in)))
 built_depend = $(strip $(addsuffix .d, $(built_php) $(built_cat)))
 
+
 # find the files that are installed but not generated
 fromsrc := $(strip\
  $(wildcard $(srcdir)/*.php)\
@@ -102,7 +103,7 @@ ifneq ($(fromsrc),)
   # put in files from pb_php_compile and pb_cat_compile
   define GET_fromsrc =
     installed_fromsrc := $$(installed_fromsrc) $$(shell\
-      if ! head -3 $(1) | grep -q '@generated_file_string@' ;\
+      if ! head -5 $(1) | grep -q '@generated_file_string@' ;\
         then echo "$$(notdir $(1))"; fi)
   endef
 $(foreach f,$(fromsrc),$(eval $(call GET_fromsrc,$(f))))
@@ -114,18 +115,26 @@ installed_fromsrc := $(strip $(installed_fromsrc))
 
 
 ifndef srcdir_equals_builddir
-  ifneq ($(strip $(wildcard $(top_srcdir)/pb_php_compile)),)
+  ifneq ($(strip $(wildcard $(top_srcdir)/@pb_build_prefix@pb_php_compile)),)
     $(error You cannot build this code in this directory\
  while building it in the source at $(top_srcdir))
   endif
 endif
 
 
-built_uncompressed = $(strip $(built_php) $(built_cat) $(built_md_html) $(built_in_any))
-built_gzip_gz = $(addsuffix .gz,\
- $(filter-out %.cs %.jsp, $(built_uncompressed) $(installed_fromsrc)))
+built_gzip_gz := $(addsuffix .gz,\
+ $(filter-out %.cs %.jsp,\
+ $(built_php)\
+ $(built_cat)\
+ $(built_md_html)\
+ $(installed_fromsrc)))
 
-built := $(strip $(built_uncompressed) $(built_gzip_gz))
+built := $(strip\
+ $(built_in_any)\
+ $(built_php)\
+ $(built_cat)\
+ $(built_md_html)\
+ $(built_gzip_gz))
 
 installed := $(strip $(filter-out %.cs %.jsp, $(built)) $(installed_fromsrc))
 
@@ -150,12 +159,15 @@ distclean_files := $(clean_files) GNUmakefile
 ifeq ($(strip $(top_builddir)),.)
 distclean_files := $(strip\
  $(distclean_files)\
- pb_auto_prepend.ph\
- pb_auto_append.ph\
- pb_php_compile\
- pb_cat_compile\
- pb_config)
+ @pb_build_prefix@pb_auto_prepend.ph\
+ @pb_build_prefix@pb_auto_append.ph\
+ @pb_build_prefix@pb_php_compile\
+ @pb_build_prefix@pb_cat_compile\
+ @pb_build_prefix@pb_config)
 endif
+
+php_compile := $(top_builddir)/@pb_build_prefix@pb_php_compile
+cat_compile := $(top_builddir)/@pb_build_prefix@pb_cat_compile
 
 ifdef subdirs
 build_rec = build_rec
@@ -169,6 +181,11 @@ endif
 ifeq ($(strip $(installed)),)
 undefine installed
 endif
+ifeq ($(strip $(built)),)
+undefine built
+endif
+
+
 
 
 .DEFAULT_GOAL = build
@@ -182,7 +199,7 @@ endif
 #####################################################################
 
 .PHONY: $(build_rec) $(clean_rec) $(_debug_rec) $(distclean_rec) $(install_rec)\
- build clean _debug distclean install _debug_norec $(install) all
+ build clean _debug distclean install _debug_norec build_norec install_norec
 
 .SUFFIXES:
 .SUFFIXES: .md .html .htm .html .php .ph .phd .css .js .gz\
@@ -197,7 +214,7 @@ endif
 
 define MAKE_in_rules =
   $(1): $(1).in
-	$(top_builddir)/pb_config $(srcdir)/$(1).in $(1)
+	$(top_builddir)/@pb_build_prefix@pb_config $(srcdir)/$(1).in $(1)
 endef
 $(foreach suf,$(built_in_any),$(eval $(call MAKE_in_rules,$(suf))))
 undefine MAKE_in_rules
@@ -221,33 +238,33 @@ include $(wildcard *.d)
 %.html: %.md
 	marked $< > $@
 %.php: %.pphp
-	$(top_builddir)/pb_php_compile $< $@
+	$(php_compile) $< $@
 %.php: %.cphp
-	$(top_builddir)/pb_cat_compile $< $@
+	$(cat_compile) $< $@
 %.html: %.phtml
-	$(top_builddir)/pb_php_compile $< $@
+	$(php_compile) $< $@
 %.html: %.chtml
-	$(top_builddir)/pb_cat_compile $< $@
+	$(cat_compile) $< $@
 %.htm: %.phtm
-	$(top_builddir)/pb_php_compile $< $@
+	$(php_compile) $< $@
 %.htm: %.chtm
-	$(top_builddir)/pb_cat_compile $< $@
+	$(cat_compile) $< $@
 %.js: %.pjs
-	$(top_builddir)/pb_php_compile $< $@
+	$(php_compile) $< $@
 %.jsp: %.pjsp
-	$(top_builddir)/pb_php_compile $< $@
+	$(php_compile) $< $@
 %.css: %.pcss
-	$(top_builddir)/pb_php_compile $< $@
+	$(php_compile) $< $@
 %.cs: %.pcs
-	$(top_builddir)/pb_php_compile $< $@
+	$(php_compile) $< $@
 %.js: %.cjs
-	$(top_builddir)/pb_cat_compile $< $@
+	$(cat_compile) $< $@
 %.jsp: %.cjsp
-	$(top_builddir)/pb_cat_compile $< $@
+	$(cat_compile) $< $@
 %.css: %.ccss
-	$(top_builddir)/pb_cat_compile $< $@
+	$(cat_compile) $< $@
 %.cs: %.ccs
-	$(top_builddir)/pb_cat_compile $< $@
+	$(cat_compile) $< $@
 %.gz: %
 	gzip -kf $<
 
@@ -262,6 +279,11 @@ endif
 distclean: $(distclean_rec)
 ifneq ($(distclean_files),)
 	rm -f $(distclean_files)
+  ifeq ($(strip $(top_builddir)),.)
+	if [ -n '@pb_build_prefix@' ] &&\
+	    [ -z "$(ls -A @pb_build_prefix@)" ] ; then\
+	    rmdir @pb_build_prefix@ ; fi
+  endif
 else
 	@echo "nothing to distclean"
 endif
@@ -273,21 +295,21 @@ _debug_norec:
 	@echo "subdirs = $(subdirs)"
 	@echo "built = $(built)"
 	@echo "installed = $(installed)"
+	@echo "install_rec=$(install_rec)"
+	@echo "build_rec=$(build_rec)"
 
 
+build_norec: $(built)
+build: build_norec $(build_rec)
 
-# Force the order in which things are built
-$(build_rec): $(built)
-build all: $(built)
-
-ifdef installed
-install: $(installed)
-endif
-$(install_rec): $(installed)
-
+install_norec: $(installed)
+install: install_norec $(install_rec)
 
 # We check for sub directory make file removal as we recurse
 ifdef subdirs
+$(build_rec): build_norec
+$(install_rec): install_norec
+
 build_rec clean_rec _debug_rec distclean_rec install_rec:
 	@for d in $(subdirs); do\
           target="$(patsubst %_rec,%,$@)" ;\

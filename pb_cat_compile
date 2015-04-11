@@ -5,7 +5,7 @@
 require 'fileutils'
 
 $include_path = []
-$include_path.push File.dirname(File.expand_path(__FILE__)) + '/@rel_include_dir@'
+$include_path.push '@rel_include_dir@'
 
 unless @srcdir_equals_builddir@
     # We are not building in the source tree
@@ -90,7 +90,8 @@ $yui = false
 # generate make depend file
 $out = File.open($outpath + '.d', 'w')
 $out.write <<END
-# this is a generated make depend file
+# @generated_file_string@
+# this is a make depend file
 
 END
 $out.write $outpath + ':'
@@ -113,7 +114,7 @@ end
 
 $gen_magic_str = '@generated_file_string@'
 
-if $outpath =~ /(\.html$|\.htm$)/ # .html .htm
+if $outpath =~ /(\.html|\.htm)$/ # .html .htm
 
     # We put '@generated_file_string@' after the <!DOCTYPE html>
     ff = File.open(find_path($files[0]), 'r')
@@ -139,15 +140,15 @@ if $outpath =~ /(\.html$|\.htm$)/ # .html .htm
     end
 
 elsif $outpath =~ /\.php$/ # .php
-    
-    $out.write "<?php /* #{$gen_magic_str} from #{$inpath} */\n?>"
+
+    $out.write "<?php\n  /* #{$gen_magic_str} from #{$inpath} */\n?>"
     $files.each do |path|
         $out.write "<?php /* START FILE: #{path} */\n?>" if @debug@
         $out.write read_file(path)
         $out.write "<?php /*   END FILE: #{path} */\n?>" if @debug@
     end
 
-elsif $outpath =~ /(\.cs$|\.css$|\.js$|\.jsp$)/ # .cs .css .js .jsp
+elsif $outpath =~ /(\.cs|\.css|\.js|\.jsp)$/ # .cs .css .js .jsp
 
     $out.write "/* #{$gen_magic_str} from #{$inpath} */\n"
     $files.each do |path|
@@ -155,6 +156,7 @@ elsif $outpath =~ /(\.cs$|\.css$|\.js$|\.jsp$)/ # .cs .css .js .jsp
         $out.write read_file(path)
         $out.write "/*   END FILE: #{path} */\n" if @debug@
     end
+
 else
     failure 'unknown file type for output file ' + $outpath
 end
