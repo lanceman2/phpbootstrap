@@ -199,13 +199,13 @@ begin
 
   if outpath
     suffix = outpath.gsub(/^.*\\./, '')
-    if suffix =~ /^(ht|thm|html)$/ and l =~ /^<!DOCTYPE /
+    if suffix =~ /^(ht|htm|html)$/ and l =~ /^<!DOCTYPE /
       sub_line(pkg, l, out)
       out.write "<!-- \#{pkg[:generated_file_string]} -->\\n"
     elsif suffix =~ /^(ht|htm|html)$/
       out.write "<!-- \#{pkg[:generated_file_string]} -->\\n"
       sub_line(pkg, l, out) if l
-    elsif suffix =~ /^(php|phtml|ph|phd)$/
+    elsif suffix =~ /^(pphp|php|phtml|ph|phd|pjs|pcss|pjsp|pcs)$/
       out.write "<?php\\n/* \#{pkg[:generated_file_string]}*/\\n ?>"
       sub_line(pkg, l, out) if l
     elsif suffix =~ /^(js|jsp|css|cs)$/
@@ -214,6 +214,9 @@ begin
     elsif suffix == 'txt'
       out.write "\# \#{pkg[:generated_file_string]}\\n"
       sub_line(pkg, l, out)
+    elsif suffix =~ /^(cjs|cjsp|ccss|ccs|cht|chtm|chtml)$/
+      out.write "# \#{pkg[:generated_file_string]}\\n"
+      sub_line(pkg, l, out) if l
     else # for bash script file
       FileUtils.chmod 0755, outpath
       if l
@@ -276,7 +279,7 @@ def print_make_file(buildpath, conf, top_builddir, rel_srcdir, data)
 
     if conf[:srcdir_equals_builddir]
         top_srcdir = top_builddir # relative path
-        srcdir = rel_srcdir
+        srcdir = '.'
         srcdir_equals_builddir = "srcdir_equals_builddir = true\n"
         if rel_srcdir != conf[:sub][:rel_include_dir]
             vpath = 'VPATH = .:' + top_srcdir + '/' + conf[:sub][:rel_include_dir]
@@ -309,13 +312,13 @@ top_srcdir := #{top_srcdir}
 
 srcdir := #{srcdir}
 
-VPATH := #{vpath}
+#{vpath}
 
 #{srcdir_equals_builddir}
 
     END
 
-    bp_make_path = srcdir + '/pb.make'
+    bp_make_path = top_srcdir + '/' + rel_srcdir + '/pb.make'
     dumpFile(bp_make_path, f, conf, false)
 
     f.write data
@@ -341,13 +344,13 @@ test__subdirs_FASDiefjmzzz:
         #$stderr.print "running: make test__subdirs_FASDiefjmzzz --silent\n"
         pwd = Dir.pwd
         Dir.chdir buildpath
-        subdirs = %x[make test__subdirs_FASDiefjmzzz --silent -f #{gpath}].split
+        subdirs = %x[make -C #{buildpath} test__subdirs_FASDiefjmzzz --silent -f GNUmakefile.tmp_zZ].split
         # bug check
         if subdirs =~ /Entering directory/
             $stderr.print "running make spewed badly again\n"
             exit 1
         elsif not $?.success?
-            $stderr.print "running make failed\n"
+            $stderr.print "  configure failed: running make failed\n"
             exit 1
         end
 
@@ -365,6 +368,7 @@ test__subdirs_FASDiefjmzzz:
     end
 
     subdirs.each do |dir|
+        next if dir == '.'
         if buildpath != '.'
             bld = buildpath + '/' + dir
         else

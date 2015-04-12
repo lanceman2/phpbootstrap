@@ -1,1 +1,1 @@
-SUBDIRS := bang pop
+SUBDIRS := bld_include . bang pop

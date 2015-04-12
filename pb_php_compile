@@ -24,7 +24,7 @@ case $2 in
         tmpout="${2}.tmp"
         ;;
     *.ph|*.phd|*.php)
-        echo -en "<?php /* $gen_file_str */\n?>" > "$tmpheader"
+        echo -en "<?php /*server*/ /* $gen_file_str */\n?>" > "$tmpheader"
         ;;
     *.js|*.css|*.jsp|*.cs)
         echo "/* $gen_file_str */" > "$tmpheader"

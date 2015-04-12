@@ -1,0 +1,35 @@
+<?php
+
+    require_once 'page.ph'
+?>
+<!DOCTYPE html>
+<head>
+    <title>index</title>
+</head>
+<body>
+
+<?php 
+    page_header();
+    echo <<<END
+  <h2>This is a h2 header</h2>
+
+END;
+
+?>
+
+<p>
+This is the @package_name@ package
+</p>
+
+<?php /*server*/
+
+  echo <<<END
+   <p>This is from serve time php</p>
+
+END
+
+?>
+
+
+</body>
+</html>

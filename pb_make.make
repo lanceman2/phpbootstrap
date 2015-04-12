@@ -19,7 +19,7 @@ endif
 
 # built_compilerscript_finalsuffix
 
-built_in_any = $(sort $(patsubst $(srcdir)/%.in, %, $(wildcard $(srcdir)/*.in)))
+built_in_any = $(strip $(patsubst $(srcdir)/%.in, %, $(wildcard $(srcdir)/*.in)))
 
 built_php_html = $(sort \
  $(patsubst $(srcdir)/%.phtml, %.html, $(wildcard $(srcdir)/*.phtml))\
@@ -123,7 +123,7 @@ endif
 
 
 built_gzip_gz := $(addsuffix .gz,\
- $(filter-out %.cs %.jsp,\
+ $(filter-out %.cs %.jsp %.php,\
  $(built_php)\
  $(built_cat)\
  $(built_md_html)\
@@ -198,11 +198,14 @@ endif
 # BEGIN RULES    How we do stuff.  There are some rules above :(
 #####################################################################
 
-.PHONY: $(build_rec) $(clean_rec) $(_debug_rec) $(distclean_rec) $(install_rec)\
- build clean _debug distclean install _debug_norec build_norec install_norec
+.PHONY: _debug build install clean distclean\
+ $(_debug_rec) $(build_rec) $(install_rec) $(clean_rec) $(distclean_rec)\
+ _debug_norec build_norec install_norec clean_norec distclean_norec\
+ _debug_do build_do install_do clean_do distclean_do
+
 
 .SUFFIXES:
-.SUFFIXES: .md .html .htm .html .php .ph .phd .css .js .gz\
+.SUFFIXES: .md .html .htm .html .ht .php .ph .phd .css .js .gz\
  .pphp .phtml .phtm .pjs .pcss .cphp .chtml .chtm .cjs .ccss .txt\
  .jsp .cs .ht .ph .phd .cjsp .ccs
 
@@ -269,14 +272,24 @@ include $(wildcard *.d)
 	gzip -kf $<
 
 
-clean: $(clean_rec)
+clean: clean_norec $(clean_rec)
+clean_norec: $(clean_rec)
+
+clean_do:
+
+clean_do clean_norec:
 ifneq ($(clean_files),)
 	rm -f $(clean_files)
 else
 	@echo "nothing to clean"
 endif
 
-distclean: $(distclean_rec)
+distclean: distclean_norec $(distclean_rec)
+distclean_norec: $(distclean_rec)
+
+distclean_do:
+
+distclean_norec:
 ifneq ($(distclean_files),)
 	rm -f $(distclean_files)
   ifeq ($(strip $(top_builddir)),.)
@@ -290,36 +303,46 @@ endif
 
 
 _debug: _debug_norec $(_debug_rec)
+ifdef subdirs
 $(_debug_rec): _debug_norec
-_debug_norec:
+endif
+_debug_norec: _debug_do
+
+_debug_do:
 	@echo "subdirs = $(subdirs)"
 	@echo "built = $(built)"
 	@echo "installed = $(installed)"
 	@echo "install_rec=$(install_rec)"
 	@echo "build_rec=$(build_rec)"
+	@echo "built_in_any=$(built_in_any)"
+	@echo "srcdir=$(srcdir)"
 
 
-build_norec: $(built)
+build_norec build_do: $(built)
+install_norec install_do: $(installed)
+
+ifeq ($(findstring .,$(subdirs)),.)
+build: $(build_rec)
+install: $(install_rec)
+else
+  ifdef subdirs
+    $(build_rec): build_norec
+    $(install_rec): install_norec
+  endif
 build: build_norec $(build_rec)
-
-install_norec: $(installed)
 install: install_norec $(install_rec)
+endif
+
 
 # We check for sub directory make file removal as we recurse
 ifdef subdirs
-$(build_rec): build_norec
-$(install_rec): install_norec
 
 build_rec clean_rec _debug_rec distclean_rec install_rec:
-	@for d in $(subdirs); do\
-          target="$(patsubst %_rec,%,$@)" ;\
-          cd $$d || exit 1 ;\
-	  if [ ! -f GNUmakefile ] ; then\
-	    echo 'Missing GNUmakefile in ${PWD}' ;\
-	    exit 1 ;\
-	  fi ;\
-          $(MAKE) $$target || exit 1 ;\
-          cd .. || exit 1 ;\
-          done
+	for d in $(subdirs); do\
+	  if [ $$d != . ] ; then\
+	    $(MAKE) -C $$d $(patsubst %_rec,%,$@) || exit 1 ;\
+	  else\
+	    $(MAKE) -C $$d $(patsubst %_rec,%_do,$@) || exit 1 ;\
+	  fi ; done
 endif
 
