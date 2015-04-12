@@ -31,7 +31,7 @@ clean distclean:
 ifdef bindir
 install: phpbootstrap
 	mkdir -p $(bindir)
-	cp phpbootstrap pb_php_compile $(bindir)
+	cp phpbootstrap $(bindir)
 else
 install:
 	@echo "Install it where?  Try something like:"
