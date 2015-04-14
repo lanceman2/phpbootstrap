@@ -5,11 +5,20 @@
 require 'fileutils'
 
 $include_path = []
-$include_path.push '@rel_include_dir@'
+
+$slash = './'
+
+
+$include_path.push File.dirname(__FILE__) + '@include_path_relto_pb_build@'
 
 unless @srcdir_equals_builddir@
-    # We are not building in the source tree
-    $include_path.push '@top_src_fullpath@/@rel_include_dir@'
+    # We are not building in the source tree so we add
+    # top_src_fullpath/rel_include_dir to the file search path
+    if '@rel_include_dir@'.length > 0
+        $include_path.push '@top_src_fullpath@/@rel_include_dir@'
+    else
+        $include_path.push '@top_src_fullpath@'
+    end
 end
 
 
@@ -19,6 +28,9 @@ Usage: pb_cat_compile inFILE outFILE
 
     END
 end
+
+
+$pwd = Dir.pwd
 
 $inpath = ARGV.shift
 $outpath = ARGV.shift
@@ -35,6 +47,7 @@ def failure(err)
     rescue
         $!.backtrace.each do |e|
             $stderr.print '  ' + e + "\n"
+    $stderr.print "p=" + p + "\n"
         end
     end
     exit 1
@@ -50,7 +63,9 @@ def find_path(path)
         if File.exist? p
             return p
         end
+        $stderr.print "p=" + p + "\n"
     end
+
 
     failure "Cannot find file " + path + " to include\n" +
         "  include path = #{$include_path.join(' ')}"

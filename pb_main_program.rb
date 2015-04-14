@@ -622,9 +622,51 @@ def parse_args
     conf[:sub][:debug] = 'true' unless conf[:sub][:debug]
     conf[:sub][:generated_file_string] = $generated_file_magic_string
     conf[:sub][:package_name] = $pb_package_name
+    # pb_build_prefix must be relative a path
     conf[:sub][:pb_build_prefix] = 'pb_build/'
+
+    conf[:sub][:pb_build_prefix] += '/' if conf[:sub][:pb_build_prefix].length > 0 and
+        conf[:sub][:pb_build_prefix][-1] != '/'
+    
+    # rel_include_dir must be a relative path
     #conf[:sub][:pb_build_prefix] = ''
     conf[:sub][:rel_include_dir] = 'bld_include'
+
+    # remove starting or ending '/'s 
+    conf[:sub][:rel_include_dir].gsub!(/(^\/*|\/*$)/, '')
+
+
+    def find_include_path_relto_pb_build(build_prefix, rel_include_dir)
+
+        # something this butt ugly needs to be a function
+
+        # ret is something like '' or '/..' or '/../..' or '/../../..' etc.
+        ret = ''
+        # strip leading '/' or '//' or './/' or './/' and so on
+        prefix = build_prefix.gsub(/^(\.\/*|\/*)/, '')
+
+        while prefix.length > 0
+            if prefix =~ /^\//
+                ret += '/..'
+                prefix.gsub!(/^\/*/, '')
+            else
+                # strip one char
+                prefix = prefix[1...10000]
+            end
+        end
+
+        # now add rel_include_dir and return it
+        if rel_include_dir.length > 0
+            ret + '/' + rel_include_dir
+        else
+            ret
+        end
+    end
+
+    conf[:sub][:include_path_relto_pb_build] =
+        find_include_path_relto_pb_build(conf[:sub][:pb_build_prefix],
+                                        conf[:sub][:rel_include_dir])
+
     conf
 end
 

@@ -4,11 +4,15 @@
 
 scriptdir="$(dirname ${BASH_SOURCE[0]})" || exit 1
 
-include_path="@rel_include_dir@"
+include_path="${scriptdir}@include_path_relto_pb_build@"
 
 if ! @srcdir_equals_builddir@ ; then
     # We are not building in the source tree
-    include_path="$include_path:@top_src_fullpath@/@rel_include_dir@"
+    if [ "@rel_include_dir@" = "" ] ; then
+        include_path="$include_path:@top_src_fullpath@"
+    else
+        include_path="$include_path:@top_src_fullpath@/@rel_include_dir@"
+    fi
 fi
 
 tmpheader="$(mktemp)"
@@ -43,7 +47,8 @@ function cleanup()
     [ "$tmpout" != "$out" ] && rm -f "$tmpout"
     if [ "$1" = 1 ] ; then
         rm -f "$out"
-        echo "$0 failed" 1>&2
+        echo "  $0 failed" 1>&2
+        echo "  include_path=$include_path" 1>&2
     #else
     #    echo "$0 succeeded" 1>&2
     fi
