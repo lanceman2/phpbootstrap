@@ -1,6 +1,4 @@
 
-# END_CONFIGURATION (keep this line)
-
 require 'fileutils'
 
 
@@ -12,7 +10,10 @@ $script_path.freeze
 $generated_file_magic_string = 'This is a phpbootstrap generated file'
 $generated_file_magic_string.freeze
 
-########################################################################
+###########################################################################
+# Less code without OOP.  Today we say fuck OOP, for tomorrow we may drown
+# in spaghetti code.
+#
 
 
 def print_gen(path)
@@ -110,7 +111,7 @@ if File.basename($script_path) == 'phpbootstrap'
     print_gen Dir.pwd + '/configure'
     rd = File.open($script_path, 'r')
     wr = File.open('configure', 'w')
-    wr.write rd.gets # get the #! line
+    wr.write rd.gets # get the #! line first
     wr.write <<-END
 # #{$generated_file_magic_string}
 #####################################################
@@ -121,10 +122,14 @@ $pb_package_name = '#{package_name}'
 
 require 'etc'
 
-# END_CONFIGURATION
+
     END
     while line = rd.gets
-        break if line =~ /^# END_CONFIGURATION/
+        # skip up to pb_file_seperator_regrex
+        if line =~ /^\$pb_file_seperator_regrex/
+            wr.write line
+            break
+        end
     end
     while line = rd.gets
         wr.write line
@@ -295,13 +300,14 @@ end
 
 
 
-def gen_pb_file(name, data, conf)
+def gen_pb_build_file(name, data, conf, is_exe = false)
 
     path =  Dir.pwd + '/' + conf[:sub][:pb_build_prefix] + name
     print_gen path
     p = File.open(path, 'w')
     p.write data
     p.close
+    File.chmod(0755, path) if is_exe
 end
 
 
@@ -504,26 +510,25 @@ def check_gen_p_install_script(name, conf)
     end
 end
 
-# global static data for  get_next_DATA()
-$data = ''
 
-def get_DATA(conf, next_regex = nil)
+def get_DATA(conf)
 
-    DATA.each_line do |line|
-        if next_regex and line =~ next_regex
-            val = $data
-            $data = <<-END
-#{line}
+    # get the #!/bin/STUFF first
+
+    data = <<-END
+#{DATA.gets}
+#
 #############################
 # #{conf[:sub][:generated_file_string]}
 ############################
 
-            END
-            return val
-        end
-        $data += sub_line(conf[:sub], line)
+    END
+
+    DATA.each_line do |line|
+        return data if line =~ $pb_file_seperator_regrex
+        data += sub_line(conf[:sub], line)
     end
-    return $data
+    return data
 end
 
 
@@ -540,30 +545,22 @@ def configure (conf)
 
     gen_pb_config conf
 
-    print_make_file('.', conf, '.', '.', get_DATA(conf, /^#\!\s*\/bin\/bash/))
+    print_make_file('.', conf, '.', '.', get_DATA(conf))
 
-    gen_pb_file('pb_php_compile', get_DATA(conf, /^#\!\s*\/usr\/bin\//), conf)
-    File.chmod(0755, conf[:sub][:pb_build_prefix] + 'pb_php_compile')
+    gen_pb_build_file('pb_php_compile', get_DATA(conf), conf, true)
 
-    gen_pb_file('pb_cat_compile',
-                get_DATA(conf, /^<\?php \/\*\*pb_auto_prepend\.ph\*\*\//),
-                conf)
-    File.chmod(0755, conf[:sub][:pb_build_prefix] + 'pb_cat_compile')
+    gen_pb_build_file('pb_cat_compile', get_DATA(conf), conf, true)
 
-    gen_pb_file('pb_auto_prepend.ph',
-                get_DATA(conf, /^<\?php \/\*\*pb_auto_append\.ph\*\*\//).strip!,
-                conf)
+    gen_pb_build_file('pb_auto_prepend.ph', get_DATA(conf).strip!, conf)
 
-    gen_pb_file('pb_auto_append.ph',
-                get_DATA(conf).strip!,
-                conf)
+    gen_pb_build_file('pb_auto_append.ph',  get_DATA(conf).strip!, conf)
 
     check_gen_p_install_script('pre_install', conf)
     
     check_gen_p_install_script('post_install', conf)
 end
 
-
+# TODO: use this or remove it.
 def help_printOpt(f, pre, text)
 
     max = 76 # length of printed text line
@@ -609,6 +606,7 @@ def usage(conf)
     source directory all files other than those in private/ that are not in
     public/ will not be installed.  Files in the build include directory will
     not be installed.
+    This configure script was generated for the package: #{$pb_package_name}.
 
 
 

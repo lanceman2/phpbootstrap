@@ -2,5 +2,5 @@
 # Any ASCII string will work.
 #
 $pb_version = '0.2'
-
 $pb_version.freeze
+
