@@ -40,4 +40,3 @@ install:
 	@echo
 	@echo "Where BINDIR is the path to a directory."
 endif
-

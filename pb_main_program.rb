@@ -1,4 +1,5 @@
-# END_CONFIGURATION
+
+# END_CONFIGURATION (keep this line)
 
 require 'fileutils'
 
@@ -63,16 +64,6 @@ if File.basename($script_path) == 'phpbootstrap'
    --name PACKAGE_NAME  set the package name to PACKAGE_NAME, the default is the
                         current directory file name
   
-   --pre-install PRE    run the script named PRE before installing files.  PRE is the
-                        path relative to the top source directory.  PRE will have @str@
-                        replaced and be built in the pb_build directory when configure
-                        is run.  The default PRE is pre_install, if it exists.
-
-   --pre-install POST   run the script named POST before installing files.  POST is the
-                        path relative to the top source directory.  PRE will have @str@
-                        replaced and be built in the pb_build directory when configure
-                        is run.  The default POST is post_install, if it exists.
-
 
         END
         exit
@@ -96,8 +87,6 @@ if File.basename($script_path) == 'phpbootstrap'
     arg = ARGV.shift
     package_name = File.basename Dir.pwd
 
-    pre_install = false
-    post_install = false
     ret = false
 
     while arg
@@ -106,23 +95,10 @@ if File.basename($script_path) == 'phpbootstrap'
             exit
         elsif ret = check_arg('--name', arg, bs_usage)
             package_name = ret
-        elsif ret = check_arg('--pre-install', arg, bs_usage)
-            pre_install = ret
-            bs_usage unless check_install_script('--pre-install', ret)
-        elsif ret = check_arg('--post-install', arg, bs_usage)
-            post_install = ret
-            bs_usage unless check_install_script('--post-install', ret)
         else
             bs_usage
         end
         arg = ARGV.shift
-    end
-
-    unless pre_install
-        pre_install = '\'pre_install\'' if File.exist? 'pre_install'
-    end
-    unless post_install
-        post_install = '\'post_install\'' if File.exist? 'post_install'
     end
 
     package_name.gsub!(/[^a-zA-Z0-9_]/, '')
@@ -143,11 +119,7 @@ if File.basename($script_path) == 'phpbootstrap'
 # pb_package_name was defined when phpbootstrap ran
 $pb_package_name = '#{package_name}'
 
-$pb_pre_install = #{pre_install}
-$pb_post_install = #{post_install}
-
 require 'etc'
-
 
 # END_CONFIGURATION
     END
@@ -224,6 +196,8 @@ outpath = ARGV[1]
 begin
 
   # pkg is how this "#{File.basename(Dir.pwd)}" package is configured
+  # These values get substituted in place of @key@ in input files when
+  # this script runs.
   pkg = {
   END
   
@@ -281,14 +255,14 @@ begin
     elsif suffix =~ /^(cjs|cjsp|ccss|ccs|cht|chtm|chtml)$/
       out.write "# \#{pkg[:generated_file_string]}\\n"
       sub_line(pkg, l, out) if l
-    else # for bash script file
+    else # for bash of ruby script file 
       FileUtils.chmod 0755, outpath
       if l
         sub_line(pkg, l, out)
       else
-        out.write "#!/bin/bash\n"
+        out.write "#!/bin/bash\\n"
       end
-      out.write "\n# \#{pkg[:generated_file_string]}\\n\\n"
+      out.write "\\n# \#{pkg[:generated_file_string]}\\n\\n"
     end
   end
 
@@ -401,30 +375,29 @@ installdir := #{installdir}
     dumpFile(bp_make_path, f, conf, false)
 
 
-    if $pb_pre_install
+    if File.exist? conf[:top_src_fullpath] + '/pre_install'
         f.print <<-END
 
 pre_install := #{top_builddir}/#{conf[:sub][:pb_build_prefix]}pb_pre_install
-$(pre_install):  #{top_srcdir}/#{$pb_pre_install}
-\t#{top_builddir}/#{conf[:sub][:pb_build_prefix]}pb_config $< $@ --no-comment
-\tchmod 755 $@
+$(pre_install):  #{top_srcdir}/pre_install
+\t#{top_builddir}/#{conf[:sub][:pb_build_prefix]}pb_config $< $@
 
         END
     else
-        f.print "# pre_install is not defined\n\n"
+        f.print "# there is no pre_install script\n\n"
     end
 
-    if $pb_post_install
+
+    if File.exist? conf[:top_src_fullpath] + '/post_install'
         f.print <<-END
 
 post_install := #{top_builddir}/#{conf[:sub][:pb_build_prefix]}pb_post_install
-$(post_install):  #{top_srcdir}/#{$pb_post_install}
-\t#{top_builddir}/#{conf[:sub][:pb_build_prefix]}pb_config $< $@ --no-comment
-\tchmod 755 $@
+$(post_install):  #{top_srcdir}/post_install
+\t#{top_builddir}/#{conf[:sub][:pb_build_prefix]}pb_config $< $@
 
     END
     else
-        f.print "# post_install is not defined\n\n"
+        f.print "# there is no post_install script\n\n"
     end
 
 
@@ -511,6 +484,49 @@ def sub_line(pkg, line)
     line
 end
 
+
+# makes pb_pre_install or pb_post_install scripts using program pb_config
+def check_gen_p_install_script(name, conf)
+
+    inPath = conf[:top_src_fullpath] + '/' + name
+ 
+    if File.exist? inPath
+        outPath = conf[:sub][:pb_build_prefix] + 'pb_' + name
+        config = conf[:sub][:pb_build_prefix] + 'pb_config'
+        print_gen outPath
+        f = IO.popen(config + ' - ' + outPath, 'w')
+        f.write File.read(inPath)
+        f.close
+        unless $?.success?
+            $stderr.print "  Failed to make #{outPath} from #{inPath}\n"
+            exit 1
+        end
+    end
+end
+
+# global static data for  get_next_DATA()
+$data = ''
+
+def get_DATA(conf, next_regex = nil)
+
+    DATA.each_line do |line|
+        if next_regex and line =~ next_regex
+            val = $data
+            $data = <<-END
+#{line}
+#############################
+# #{conf[:sub][:generated_file_string]}
+############################
+
+            END
+            return val
+        end
+        $data += sub_line(conf[:sub], line)
+    end
+    return $data
+end
+
+
 def configure (conf)
 
     if conf[:sub][:pb_build_prefix] and
@@ -524,64 +540,27 @@ def configure (conf)
 
     gen_pb_config conf
 
-    data = ['','','','','']
-    i = 0
-    DATA.each_line do |line|
-        # There must be a cleaner way to do this.
-        if i < 2 and (line =~ /^#\!\s*\/bin\/bash/ or
-                line =~ /^#\!\s*\/usr\/bin\//)
-            data[i += 1] += <<-END
-#{line}
-############################
-# #{conf[:sub][:generated_file_string]}
-############################
+    print_make_file('.', conf, '.', '.', get_DATA(conf, /^#\!\s*\/bin\/bash/))
 
-            END
-        elsif i >= 2 and i < 4 and
-            (line =~ /^<\?php \/\*\*pb_auto_prepend\.ph\*\*\// or\
-            line =~ /^<\?php \/\*\*pb_auto_append\.ph\*\*\//)
-            data[i += 1] += "<?php /*** #{conf[:sub][:generated_file_string]} ***/\n"
-        elsif i >= 0 and i <= 4
-            data[i] += sub_line(conf[:sub], line)
-        else
-            $stderr.print "Code error reading DATA in #{__FILE__}\n"
-            exit 1
-        end
-    end
-
-
-    print_make_file('.', conf, '.', '.', data[0])
-
-    gen_pb_file('pb_php_compile', data[1], conf)
+    gen_pb_file('pb_php_compile', get_DATA(conf, /^#\!\s*\/usr\/bin\//), conf)
     File.chmod(0755, conf[:sub][:pb_build_prefix] + 'pb_php_compile')
 
-    gen_pb_file('pb_cat_compile', data[2], conf)
+    gen_pb_file('pb_cat_compile',
+                get_DATA(conf, /^<\?php \/\*\*pb_auto_prepend\.ph\*\*\//),
+                conf)
     File.chmod(0755, conf[:sub][:pb_build_prefix] + 'pb_cat_compile')
 
-    gen_pb_file('pb_auto_prepend.ph', data[3].strip!, conf)
+    gen_pb_file('pb_auto_prepend.ph',
+                get_DATA(conf, /^<\?php \/\*\*pb_auto_append\.ph\*\*\//).strip!,
+                conf)
 
-    gen_pb_file('pb_auto_append.ph', data[4].strip!, conf)
+    gen_pb_file('pb_auto_append.ph',
+                get_DATA(conf).strip!,
+                conf)
 
-    if $pb_pre_install
-        p = conf[:top_src_fullpath] + '/' + $pb_pre_install
-        data = ''
-        File.open(p, 'r').each_line do |line|
-            data += sub_line(conf[:sub], line)
-        end
-        gen_pb_file('pb_pre_install', data, conf)
-        File.chmod(0755, conf[:sub][:pb_build_prefix] + 'pb_pre_install')
-    end
-
-    if $pb_post_install
-        p = conf[:top_src_fullpath] + '/' + $pb_post_install
-        data = ''
-        File.open(p, 'r').each_line do |line|
-            data += sub_line(conf[:sub], line)
-        end
-        gen_pb_file('pb_post_install', data, conf)
-        File.chmod(0755, conf[:sub][:pb_build_prefix] + 'pb_post_install')
-    end
-
+    check_gen_p_install_script('pre_install', conf)
+    
+    check_gen_p_install_script('post_install', conf)
 end
 
 
@@ -690,8 +669,6 @@ def parse_args
     conf[:default_prefix] =  Dir.pwd + '/pb_service'
     conf[:public] = Dir.pwd + '/pb_service/public'
     conf[:private] = Dir.pwd + '/pb_service/private'
-    conf[:pre_install] = 'pre_install'
-    conf[:post_install] = 'post_install'
 
     conf[:sub][:install_user] = Etc.getpwuid(Process.uid).name
     conf[:sub][:web_user] = conf[:sub][:install_user]
@@ -751,6 +728,7 @@ def parse_args
         conf[:srcdir_equals_builddir] = false
     end
 
+
     # building include path relative to top source dir
     conf[:sub][:top_src_fullpath] = conf[:top_src_fullpath]
     conf[:sub][:srcdir_equals_builddir] = conf[:srcdir_equals_builddir]
@@ -760,7 +738,6 @@ def parse_args
     conf[:sub][:css_compile] = conf[:sub][:yui_path] +\
         ' --type css --line-break 50' unless conf[:sub][:css_compile]
 
-    conf[:sub][:debug] = 'true' unless conf[:sub][:debug]
     conf[:sub][:generated_file_string] = $generated_file_magic_string
     conf[:sub][:package_name] = $pb_package_name
     # pb_build_prefix must be relative a path
@@ -806,6 +783,7 @@ def parse_args
 
     conf[:sub][:private] = conf[:private]
     conf[:sub][:public] = conf[:public]
+
 
     conf[:sub][:include_path_relto_pb_build] =
         find_include_path_relto_pb_build(conf[:sub][:pb_build_prefix],

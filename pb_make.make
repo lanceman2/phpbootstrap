@@ -240,6 +240,10 @@ undefine MAKE_in_rules
 include $(wildcard *.d)
 
 
+# NOTE: we do not compile .jsp to a .js directly with YUI, and the same
+# goes for .cs to .css; instead we use .cjs and .ccss or .pjs and .pcss
+# respectively.
+
 # generic suffix rules
 %.html: %.md
 	marked $< > $@
