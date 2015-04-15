@@ -136,6 +136,7 @@ built := $(strip\
  $(built_md_html)\
  $(built_gzip_gz))
 
+ifdef installdir
 installed := $(strip $(filter-out %.cs %.jsp %.ph %.phd, $(built)) $(installed_fromsrc))
 
 # Check for duplicate installed files.
@@ -151,6 +152,7 @@ endef
 $(foreach f,$(installed),$(eval $(call CHECK_dups,$(f))))
 undefine dups
 undefine CHECK_dups
+endif # ifdef installdir
 
 
 clean_files := $(sort $(built) $(wildcard *.d))

@@ -47,7 +47,6 @@ def failure(err)
     rescue
         $!.backtrace.each do |e|
             $stderr.print '  ' + e + "\n"
-    $stderr.print "p=" + p + "\n"
         end
     end
     exit 1

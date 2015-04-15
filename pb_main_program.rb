@@ -1,6 +1,6 @@
 
 require 'fileutils'
-
+require 'etc'
 
 $script_path = File.expand_path __FILE__
 $script_path.freeze
@@ -119,9 +119,6 @@ if File.basename($script_path) == 'phpbootstrap'
 #####################################################
 # pb_package_name was defined when phpbootstrap ran
 $pb_package_name = '#{package_name}'
-
-require 'etc'
-
 
     END
     while line = rd.gets
@@ -344,12 +341,30 @@ def print_make_file(buildpath, conf, top_builddir, rel_srcdir, data)
         srcdir_equals_builddir = "# srcdir_equals_builddir = false\n"
     end
 
-    if rel_srcdir =~ /^private($|\/)/
-        installdir = conf[:private]
-    else # public
+
+    if rel_srcdir =~ conf[:rel_include_dir_regrex]
+        installdir = false
+    elsif rel_srcdir =~ /^private($|\/)/
+        installdir = rel_srcdir.sub(/^private/,conf[:private])
+    elsif conf[:public_in_topsrc]
+        if rel_srcdir != '.'
+            installdir = conf[:public] + '/' + rel_srcdir
+        else
+            installdir = conf[:public]
+        end
+    elsif rel_srcdir =~ /^public($|\/)/
+        # public | public/foo
         installdir = conf[:public]
+        installdir += '/' + rel_srcdir if rel_srcdir != '.'
+    else
+        installdir = false
     end
-    installdir += '/' + rel_srcdir if rel_srcdir != '.'
+
+    if installdir
+        installdir = "installdir := #{installdir}"
+    else
+        installdir = "# installdir is not defined for this directory"
+    end
 
 
     path = File.expand_path(buildpath) + '/GNUmakefile'
@@ -364,7 +379,7 @@ top_srcdir := #{top_srcdir}
 
 srcdir := #{srcdir}
 
-installdir := #{installdir}
+#{installdir}
 
 #{vpath}
 
@@ -782,10 +797,21 @@ def parse_args
     conf[:sub][:private] = conf[:private]
     conf[:sub][:public] = conf[:public]
 
+    # TODO: see if public is in a subdirectory?
+    if File.directory?('public')
+        conf[:public_in_topsrc] = false
+    else
+        conf[:public_in_topsrc] = true
+    end
 
     conf[:sub][:include_path_relto_pb_build] =
         find_include_path_relto_pb_build(conf[:sub][:pb_build_prefix],
                                         conf[:sub][:rel_include_dir])
+
+    conf[:rel_include_dir_regrex] =
+        Regexp.new( '^' +
+                   Regexp.escape(conf[:sub][:rel_include_dir]) +
+                   '($|\\/)')
 
     conf
 end

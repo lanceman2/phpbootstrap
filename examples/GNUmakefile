@@ -24,6 +24,7 @@ build: clean
 	    mkdir -p $${d}_BUILD ;\
 	    cd $${d}_BUILD || exit 1 ;\
 	    ../$$d/configure || exit 1 ;\
+	    $(MAKE) || exit 1 ;\
 	    $(MAKE) install || exit 1 ;\
 	    if [ -f install_test ] ; then ./install_test || exit 1 ; fi ;\
 	    cd .. || exit 1 ;\
