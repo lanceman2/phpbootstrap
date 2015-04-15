@@ -1,1 +1,1 @@
-SUBDIRS := bld_include . bang pop
+SUBDIRS := bld_include . bang pop private

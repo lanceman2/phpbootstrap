@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# make an default account in @private@/accounts
+# etc
+
+
+# do stuff like this
+#sudo chown -R @web_user@ @public@/band
+#sudo chown -R @web_user@ @private@/accounts
+
+echo "ran $0"
+

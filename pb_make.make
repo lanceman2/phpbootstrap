@@ -136,7 +136,7 @@ built := $(strip\
  $(built_md_html)\
  $(built_gzip_gz))
 
-installed := $(strip $(filter-out %.cs %.jsp, $(built)) $(installed_fromsrc))
+installed := $(strip $(filter-out %.cs %.jsp %.ph %.phd, $(built)) $(installed_fromsrc))
 
 # Check for duplicate installed files.
 # This is why we did not sort $(built) and $(installed).
@@ -163,8 +163,11 @@ distclean_files := $(strip\
  @pb_build_prefix@pb_auto_append.ph\
  @pb_build_prefix@pb_php_compile\
  @pb_build_prefix@pb_cat_compile\
- @pb_build_prefix@pb_config)
+ @pb_build_prefix@pb_config\
+ $(pre_install)\
+ $(post_install))
 endif
+
 
 php_compile := $(top_builddir)/@pb_build_prefix@pb_php_compile
 cat_compile := $(top_builddir)/@pb_build_prefix@pb_cat_compile
@@ -201,7 +204,7 @@ endif
 .PHONY: _debug build install clean distclean\
  $(_debug_rec) $(build_rec) $(install_rec) $(clean_rec) $(distclean_rec)\
  _debug_norec build_norec install_norec clean_norec distclean_norec\
- _debug_do build_do install_do clean_do distclean_do
+ _debug_do build_do install_do clean_do distclean_do post_install
 
 
 .SUFFIXES:
@@ -321,16 +324,42 @@ _debug_do:
 build_norec build_do: $(built)
 install_norec install_do: $(installed)
 
+
+install_norec install_do:
+ifeq ($(MAKELEVEL),0)
+ifdef pre_install
+	$(pre_install)
+endif
+endif
+ifdef installed
+	if [ ! -d $(installdir) ] ; then\
+	    mkdir -p $(installdir) ; fi
+	cp $(installed) $(installdir)
+endif
+
+
+ifdef post_install
+ifeq ($(MAKELEVEL),0)
+install: post_install
+post_install: install_do $(install_rec)
+	$(post_install)
+endif
+endif
+
+
 ifeq ($(findstring .,$(subdirs)),.)
-build: $(build_rec)
-install: $(install_rec)
+  build: build_rec
+  install: install_rec
 else
   ifdef subdirs
-    $(build_rec): build_norec
-    $(install_rec): install_norec
+    build_rec: build_norec
+    install_rec: install_norec
+    build: build_norec build_rec
+    install: install_norec install_rec
+  else
+    build: build_do
+    install: install_do
   endif
-build: build_norec $(build_rec)
-install: install_norec $(install_rec)
 endif
 
 

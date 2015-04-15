@@ -7,6 +7,7 @@ subdirs = $(filter-out GNUmakefile %_BUILD,$(wildcard *))
 rm_dirs = $(strip $(wildcard $(addsuffix /installed/,$(subdirs))) $(wildcard *_BUILD))
 made_dirs = $(patsubst %/GNUmakefile,%,$(wildcard $(addsuffix /GNUmakefile,$(subdirs))))
 configure_files = $(sort $(wildcard */configure))
+installed_services = $(sort $(wildcard */pb_service))
 
 build: clean
 	$(MAKE) -C ..
@@ -31,6 +32,7 @@ build: clean
 	    echo ;\
 	    cd $$d || exit 1 ;\
 	    ./configure || exit 1 ;\
+	    $(MAKE) || exit 1 ;\
 	    $(MAKE) install || exit 1 ;\
             if [ -f install_test ] ; then ./install_test || exit 1 ; fi ;\
 	    cd .. || exit 1 ;\
@@ -51,6 +53,9 @@ endif
 ifneq ($(configure_files),)
 	rm $(configure_files)
 endif
-ifeq ($(strip $(rm_dirs) $(made_dirs) $(configure_files)),)
+ifneq ($(installed_services),)
+	rm -rf $(installed_services)
+endif
+ifeq ($(strip $(rm_dirs) $(made_dirs) $(installed_services) $(configure_files)),)
 	@echo "Nothing to clean."
 endif

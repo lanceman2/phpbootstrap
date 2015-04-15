@@ -1,0 +1,12 @@
+#!/bin/bash
+
+mkdir -p @public@/band
+mkdir -p @public@/pop
+mkdir -p @private@/accounts
+
+# do stuff like this
+#sudo chown -R @install_user@ @public@/band
+#sudo chown -R @install_user@ @private@/accounts
+
+echo "ran $0"
+

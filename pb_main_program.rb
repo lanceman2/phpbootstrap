@@ -8,7 +8,7 @@ $script_path.freeze
 
 # Every file that we generate gets this, generated_file_magic_string, in
 # it at or close to the top in a comment.
-$generated_file_magic_string = 'phpbootstrap: This is a generated file'
+$generated_file_magic_string = 'This is a phpbootstrap generated file'
 $generated_file_magic_string.freeze
 
 ########################################################################
@@ -25,10 +25,29 @@ def print_gen(path)
 
 end
 
+def check_arg(name, arg, usage)
+
+    if arg == name
+        arg = ARGV.shift
+        usage unless arg
+        $argOpts += ' ' + arg
+        return arg
+    end
+
+    regexp = Regexp.new '^' + name + '='
+
+    if arg =~ regexp
+        return arg.sub(regexp, '')
+    end
+
+    return false
+end
+
 
 if File.basename($script_path) == 'phpbootstrap'
 
-    def usage
+    def bs_usage
+
         puts <<-END
   Usage: phpbootstrap [-h|--help]|[-V|--version]
 
@@ -37,33 +56,73 @@ if File.basename($script_path) == 'phpbootstrap'
   
       OPTIONS
 
-        -h|--help            print this help and exit
+   -h|--help            print this help and exit
 
-        -V|--version         print the phpbootstrap version (#{$pb_version}) and exit
+   -V|--version         print the phpbootstrap version (#{$pb_version}) and exit
 
-        --name PACKAGE_NAME  set the package name to PACKAGE_NAME, the default is the
-                             current directory file name
+   --name PACKAGE_NAME  set the package name to PACKAGE_NAME, the default is the
+                        current directory file name
+  
+   --pre-install PRE    run the script named PRE before installing files.  PRE is the
+                        path relative to the top source directory.  PRE will have @str@
+                        replaced and be built in the pb_build directory when configure
+                        is run.  The default PRE is pre_install, if it exists.
+
+   --pre-install POST   run the script named POST before installing files.  POST is the
+                        path relative to the top source directory.  PRE will have @str@
+                        replaced and be built in the pb_build directory when configure
+                        is run.  The default POST is post_install, if it exists.
+
 
         END
         exit
     end
 
+    def check_install_script(name, val)
+
+        if val[0] == '/'
+            puts "#{name} cannot be a full path"
+            return false
+        end
+
+        if File.exist?val
+            return true # success
+        else
+            puts "  file #{val} was not found"
+            return false
+        end
+    end
+
     arg = ARGV.shift
     package_name = File.basename Dir.pwd
 
+    pre_install = false
+    post_install = false
+    ret = false
+
     while arg
-        case arg
-        when /(--version|-V)/
+        if arg =~ /(--version|-V)/
             puts $pb_version
             exit
-        when /--name=/
-            package_name = arg.sub(/--name=/, '')
-        when /^--name$/
-            usage if not (arg = ARGV.shift)
-             package_name = arg
+        elsif ret = check_arg('--name', arg, bs_usage)
+            package_name = ret
+        elsif ret = check_arg('--pre-install', arg, bs_usage)
+            pre_install = ret
+            bs_usage unless check_install_script('--pre-install', ret)
+        elsif ret = check_arg('--post-install', arg, bs_usage)
+            post_install = ret
+            bs_usage unless check_install_script('--post-install', ret)
         else
-            usage
+            bs_usage
         end
+        arg = ARGV.shift
+    end
+
+    unless pre_install
+        pre_install = '\'pre_install\'' if File.exist? 'pre_install'
+    end
+    unless post_install
+        post_install = '\'post_install\'' if File.exist? 'post_install'
     end
 
     package_name.gsub!(/[^a-zA-Z0-9_]/, '')
@@ -83,6 +142,12 @@ if File.basename($script_path) == 'phpbootstrap'
 #####################################################
 # pb_package_name was defined when phpbootstrap ran
 $pb_package_name = '#{package_name}'
+
+$pb_pre_install = #{pre_install}
+$pb_post_install = #{post_install}
+
+require 'etc'
+
 
 # END_CONFIGURATION
     END
@@ -131,7 +196,7 @@ def usage
 
 puts <<EEND
 
-  Usage: pb_config INFILE OUTFILE
+  Usage: pb_config INFILE OUTFILE [--no-comment]
 
   Subsitute @strings@ in INFILE and create OUTFILE.
   If INFILE is '-' use stdin.
@@ -141,7 +206,7 @@ exit 1
 
 end # usage()
 
-if ARGV.length != 2
+if ARGV.length < 2 or ARGV.length > 3
     usage
 end
 
@@ -195,9 +260,8 @@ begin
   end
 
 
-  l = fin.gets
-
-  if outpath
+  if outpath and not ARGV[2]
+    l = fin.gets
     suffix = outpath.gsub(/^.*\\./, '')
     if suffix =~ /^(ht|htm|html)$/ and l =~ /^<!DOCTYPE /
       sub_line(pkg, l, out)
@@ -269,7 +333,7 @@ end
 
 # buildpath is the dir where to write GNUmakefile
 # top_builddir is a relative path like . or .. or ../..
-# rel_srcdir is path relative to the top source dir like foo/bar
+# rel_srcdir is path relative to the top source dir like '.' or 'foo' or 'foo/bar'
 def print_make_file(buildpath, conf, top_builddir, rel_srcdir, data)
 
     unless File.exist? buildpath
@@ -300,6 +364,14 @@ def print_make_file(buildpath, conf, top_builddir, rel_srcdir, data)
         srcdir_equals_builddir = "# srcdir_equals_builddir = false\n"
     end
 
+    if rel_srcdir =~ /^private($|\/)/
+        installdir = conf[:private]
+    else # public
+        installdir = conf[:public]
+    end
+    installdir += '/' + rel_srcdir if rel_srcdir != '.'
+
+
     path = File.expand_path(buildpath) + '/GNUmakefile'
     print_gen path
     f = File.open(path , 'w')
@@ -312,14 +384,49 @@ top_srcdir := #{top_srcdir}
 
 srcdir := #{srcdir}
 
+installdir := #{installdir}
+
 #{vpath}
 
 #{srcdir_equals_builddir}
 
     END
 
-    bp_make_path = top_srcdir + '/' + rel_srcdir + '/pb.make'
+
+    if rel_srcdir != '.'
+        bp_make_path = top_srcdir + '/' + rel_srcdir + '/pb.make'
+    else
+        bp_make_path = top_srcdir + '/pb.make'
+    end
     dumpFile(bp_make_path, f, conf, false)
+
+
+    if $pb_pre_install
+        f.print <<-END
+
+pre_install := #{top_builddir}/#{conf[:sub][:pb_build_prefix]}pb_pre_install
+$(pre_install):  #{top_srcdir}/#{$pb_pre_install}
+\t#{top_builddir}/#{conf[:sub][:pb_build_prefix]}pb_config $< $@ --no-comment
+\tchmod 755 $@
+
+        END
+    else
+        f.print "# pre_install is not defined\n\n"
+    end
+
+    if $pb_post_install
+        f.print <<-END
+
+post_install := #{top_builddir}/#{conf[:sub][:pb_build_prefix]}pb_post_install
+$(post_install):  #{top_srcdir}/#{$pb_post_install}
+\t#{top_builddir}/#{conf[:sub][:pb_build_prefix]}pb_config $< $@ --no-comment
+\tchmod 755 $@
+
+    END
+    else
+        f.print "# post_install is not defined\n\n"
+    end
+
 
     f.write data
     f.close
@@ -347,7 +454,7 @@ test__subdirs_FASDiefjmzzz:
         subdirs = %x[make -C #{buildpath} test__subdirs_FASDiefjmzzz --silent -f GNUmakefile.tmp_zZ].split
         # bug check
         if subdirs =~ /Entering directory/
-            $stderr.print "running make spewed badly again\n"
+            $stderr.print "running makitems.html.gze spewed badly again\n"
             exit 1
         elsif not $?.success?
             $stderr.print "  configure failed: running make failed\n"
@@ -455,6 +562,26 @@ def configure (conf)
 
     gen_pb_file('pb_auto_append.ph', data[4].strip!, conf)
 
+    if $pb_pre_install
+        p = conf[:top_src_fullpath] + '/' + $pb_pre_install
+        data = ''
+        File.open(p, 'r').each_line do |line|
+            data += sub_line(conf[:sub], line)
+        end
+        gen_pb_file('pb_pre_install', data, conf)
+        File.chmod(0755, conf[:sub][:pb_build_prefix] + 'pb_pre_install')
+    end
+
+    if $pb_post_install
+        p = conf[:top_src_fullpath] + '/' + $pb_post_install
+        data = ''
+        File.open(p, 'r').each_line do |line|
+            data += sub_line(conf[:sub], line)
+        end
+        gen_pb_file('pb_post_install', data, conf)
+        File.chmod(0755, conf[:sub][:pb_build_prefix] + 'pb_post_install')
+    end
+
 end
 
 
@@ -489,25 +616,44 @@ def help_printOpt(f, pre, text)
 end
 
 
-def usage
+def usage(conf)
 
     $stdout.print <<END
   
   Usage: #{File.basename __FILE__} [OPTIONS]
 
-    Creates GNUmakefile make files.
+    Creates GNUmakefile make files.  Files are installed with the same directory
+    structure as the source files starting at directories public/ and private/.
+    If the directory public/ does not exist all the files are copied to the
+    public/ install directory, except the files in private/ if it exists in the
+    top source directory.  If there is a directory named public/ in the top
+    source directory all files other than those in private/ that are not in
+    public/ will not be installed.  Files in the build include directory will
+    not be installed.
+
 
 
                  OPTIONS
 
   --help|-h           print this help and exit
+  
+  --debug true|false  make it a debug build, i.e. not production, or not
+
+  --prefix PREFIX     full path to where to install PUBLIC and PRIVATE docs.
+                      The current default is #{conf[:default_prefix]}.
+                      Setting this will set PRIVATE and PUBLIC to PREFIX/private
+                      and PREFIX/public respectively.
+
+  --private PRIVATE   full path prefix to installed files that are not web accessible.
+                      The default is PREFIX/private.  Setting this will override PREFIX.
+
+  --public PUBLIC     full path prefix to installed files that are web accessible.
+                      The default is PREFIX/public.  Setting this will override PREFIX.
+
+  --web-user USER     web server user that owns files that are written by the server.
+                      By default the user that runs this configure script is the web USER.
 
   --version|-V        print the phpbootstrap version number (#{$pb_version}) and exit.
-
-  --public PUBLIC     full path prefix to installed files that are web accessible
-
-  --private PRIVATE   full path prefix to installed files that are not web accessible
-  --debug true|false  make it a debug build, i.e. not production, or not
 
 
 END
@@ -515,23 +661,6 @@ END
 end
 
 
-def check_arg(name, arg)
-
-    if arg == name
-        arg = ARGV.shift
-        usage unless arg
-        $argOpts += ' ' + arg
-        return arg
-    end
-
-    regexp = Regexp.new '^' + name + '='
-
-    if arg =~ regexp
-        return arg.sub(regexp, '')
-    end
-
-    return false
-end
 
 def which(path)
 
@@ -558,20 +687,32 @@ def parse_args
     # default debug value # TODO change this
     conf[:sub][:debug] = true
 
-    conf[:public] = Dir.pwd + '/testPublic'
-    conf[:private] = Dir.pwd + '/testPrivate'
+    conf[:default_prefix] =  Dir.pwd + '/pb_service'
+    conf[:public] = Dir.pwd + '/pb_service/public'
+    conf[:private] = Dir.pwd + '/pb_service/private'
+    conf[:pre_install] = 'pre_install'
+    conf[:post_install] = 'post_install'
+
+    conf[:sub][:install_user] = Etc.getpwuid(Process.uid).name
+    conf[:sub][:web_user] = conf[:sub][:install_user]
+
+
 
     while arg
         if  arg =~ /(--version|-V)/
             puts $pb_version
             exit
-        elsif ret = check_arg('--public', arg)
+        elsif ret = check_arg('--public', arg, usage)
             conf[:public] = File.expand_path ret
-        elsif ret = check_arg('--private', arg)
+        elsif ret = check_arg('--private', arg, usage)
             conf[:private] = File.expand_path ret
-        elsif ret = check_arg('--private', arg)
-            conf[:private] = File.expand_path ret
-        elsif ret = check_arg('--debug', arg)
+        elsif ret = check_arg('--web-user', arg, usage)
+            conf[:web_user] = File.expand_path ret
+        elsif ret = check_arg('--prefix', arg, usage)
+            ret = File.expand_path ret
+            conf[:public] = ret + '/public'
+            conf[:private] = ret + '/private'
+        elsif ret = check_arg('--debug', arg, usage)
             ret.downcase!
             if conf[:sub][:debug] # default is true
                 conf[:sub][:debug] = 'false' if ret =~ /(^n|^f|^0|^of)/
@@ -579,7 +720,7 @@ def parse_args
                 conf[:sub][:debug] = 'true' if ret =~ /(^y|^t|^[1-9]|^on|^al)/
             end
         else
-            usage
+            usage conf
         end
     end
 
@@ -662,6 +803,9 @@ def parse_args
             ret
         end
     end
+
+    conf[:sub][:private] = conf[:private]
+    conf[:sub][:public] = conf[:public]
 
     conf[:sub][:include_path_relto_pb_build] =
         find_include_path_relto_pb_build(conf[:sub][:pb_build_prefix],
