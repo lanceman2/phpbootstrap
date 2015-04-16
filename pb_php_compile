@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Usage: pb_php_compile in out
+# Usage: pb_php_compile in out [url_path_dir]
 
 scriptdir="$(dirname ${BASH_SOURCE[0]})" || exit 1
 
@@ -15,24 +15,28 @@ if ! @srcdir_equals_builddir@ ; then
     fi
 fi
 
-tmpheader="$(mktemp)"
+include_path="$include_path:$scriptdir"
+
+
+header=''
+tmpout="${2}.tmp"
+tmpout2="${2}.tmp2"
 in="$1"
-tmpout="$2"
 out="$2"
+export PHP_URLPATHDIR="$3"
 
 # magic string used in pb_make.make and pb_cat_compile too
 gen_file_str="@generated_file_string@ from $1"
 
 case $2 in
-    *.html|*.htm)
-        tmpout="${2}.tmp"
+    *.html|*.htm|*ht)
+        header="<!-- $gen_file_str -->"
         ;;
     *.ph|*.phd|*.php)
-        echo -en "<?php /*server*/ /* $gen_file_str */\n?>" > "$tmpheader"
+        header="<?php /*server*/ /* $gen_file_str */\n?>"
         ;;
     *.js|*.css|*.jsp|*.cs)
-        echo "/* $gen_file_str */" > "$tmpheader"
-        tmpout="${2}.tmp"
+        header="/* $gen_file_str */"
         ;;
     *)
         echo "unknown file type for $2"  1>&2
@@ -43,8 +47,7 @@ esac
 
 function cleanup()
 {
-    rm -f "$tmpheader"
-    [ "$tmpout" != "$out" ] && rm -f "$tmpout"
+    rm -f "$tmpout" "$tmpout2"
     if [ "$1" = 1 ] ; then
         rm -f "$out"
         echo "  $0 failed" 1>&2
@@ -59,8 +62,10 @@ set -e
 set -o pipefail
 
 export PHP_OUTFILENAME="$out"
+export PHP_INFILENAME="$in"
 
-cat "$tmpheader" $in | sed -e 's/<?php\s*\/\*\s*server\s*\*\//<@php@/g' |\
+
+sed -e 's/<?php\s*\/\*\s*server\s*\*\//<@php@/g' $in |\
  @php_path@\
  -d display_errors=stderr\
  -d "error_reporting=E_ALL|E_STRICT|E_NOTICE"\
@@ -74,25 +79,33 @@ cat "$tmpheader" $in | sed -e 's/<?php\s*\/\*\s*server\s*\*\//<@php@/g' |\
 
 case $2 in
     *.js|*.jsp)
-        @js_compile@ "$tmpout" > "$out" || cleanup 1
+        echo "$header" > "$tmpout2"
+        @js_compile@ "$tmpout" >> "$tmpout2" || cleanup 1
         ;;
     *.css|*.cs)
-        @css_compile@ "$tmpout" > "$out" || cleanup 1
+        echo "$header" > "$tmpout2"
+        @css_compile@ "$tmpout" >> "$out" || cleanup 1
         ;;
-    *.html|*.htm)
+    *.html|*.htm|*.ht)
         l="$(head -1 $tmpout)" || cleanup 1
         if [[ "$l" =~ '<!DOCTYPE' ]] ; then
             # first line
             echo "$l" > "$out"
-            echo "<!-- $gen_file_str -->" >> "$out"
+            echo "$header" >> "$out"
             # the rest of it
             sed -n '2,1000000p' $tmpout >> "$out"
         else
-            echo "<!-- $gen_file_str -->" > "$out"
+            echo "$header" > "$out"
             cat $tmpout >> "$out"
         fi
         ;;
+    *.ph|*.phd|*.php)
+        echo "$header" > "$out"
+        cat $tmpout >> "$out"
+        ;;
     *)
+        echo "unknown file type for $2" 1>&2
+        cleanup 1
         ;;
 esac
 

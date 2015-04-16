@@ -21,6 +21,9 @@ unless @srcdir_equals_builddir@
     end
 end
 
+$include_path.push File.dirname(__FILE__)
+
+
 
 if ARGV.length != 2
     $stderr.print <<-END
@@ -73,7 +76,6 @@ end
 def read_file(path)
 
     File.read(find_path(path))
-
 end
 
 
@@ -112,23 +114,37 @@ $out.write $outpath + ':'
 $files.each do |f|
     $out.write "\\\n " + f
 end
+
 $out.write "\n"
 $out.close
+$gen_magic_str = '@generated_file_string@'
+
+def writeComment(outpath, inpath)
+
+    f = File.open(outpath, 'w')
+    f.write "/* #{$gen_magic_str} from #{inpath} */\n"
+    f.close
+end
 
 
-if $outpath =~ /\.css$/ and not @debug@
-    $yui = '@css_compile@ > ' + $outpath
+if $outpath =~ /\.cs(s|)$/ and not @debug@
+    writeComment($outpath, $inpath)
+    $yui = '@css_compile@ >> ' + $outpath
     $out = IO.popen($yui, 'w')
-elsif $outpath =~ /\.js$/ and not @debug@
-    $yui = '@js_compile@ > ' + $outpath
+elsif $outpath =~ /\.js(p|)$/ and not @debug@
+    writeComment($outpath, $inpath)
+    $yui = '@js_compile@ >> ' + $outpath
     $out = IO.popen($yui, 'w')
+elsif $outpath =~ /(\.cs|\.css|\.js|\.jsp)$/
+    writeComment($outpath, $inpath)
+    $out = File.open($outpath, 'a')
 else
     $out = File.open($outpath, 'w')
 end
 
-$gen_magic_str = '@generated_file_string@'
 
-if $outpath =~ /(\.html|\.htm)$/ # .html .htm
+
+if $outpath =~ /(\.html|\.htm|\.ht)$/ # .html .htm .ht
 
     # We put '@generated_file_string@' after the <!DOCTYPE html>
     ff = File.open(find_path($files[0]), 'r')
@@ -153,7 +169,7 @@ if $outpath =~ /(\.html|\.htm)$/ # .html .htm
         $out.write "<!--   END FILE: #{path} -->\n" if @debug@
     end
 
-elsif $outpath =~ /\.php$/ # .php
+elsif $outpath =~ /(\.php|\.ph|\.phd)$/ # .php
 
     $out.write "<?php\n  /* #{$gen_magic_str} from #{$inpath} */\n?>"
     $files.each do |path|
@@ -164,11 +180,10 @@ elsif $outpath =~ /\.php$/ # .php
 
 elsif $outpath =~ /(\.cs|\.css|\.js|\.jsp)$/ # .cs .css .js .jsp
 
-    $out.write "/* #{$gen_magic_str} from #{$inpath} */\n"
     $files.each do |path|
-        $out.write "/* START FILE: #{path} */\n" if @debug@
+        $out.write "/* START FILE: --------------- #{path} ---------------- */\n" if @debug@
         $out.write read_file(path)
-        $out.write "/*   END FILE: #{path} */\n" if @debug@
+        $out.write "/*   END FILE: --------------- #{path} ---------------- */\n" if @debug@
     end
 
 else

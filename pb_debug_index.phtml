@@ -1,0 +1,151 @@
+<?php /*pb_debug_index.phtml*/
+?><!DOCTYPE html>
+<html>
+<head>
+    <title><?php echo getcwd(); ?></title>
+    <style>
+<?php readfile('pb_index.cs', true /*use include path*/); ?>
+    </style>
+</head>
+<body class=index>
+
+    <div style="font-size:70%;">This
+        page is for debugging, and should not be
+        seen on a production web server on the
+        Internet.  You may be able to use the <a href='.'>browsers
+        local file indexing</a> too.</div>
+
+    <div style="margin:15px;font-size:120%;">url directory: <span
+        style="font-weight:bold;"><?php
+        echo $_ENV['PHP_URLPATHDIR']; ?></span></div>
+
+<?php
+$this_file_out = $_ENV['PHP_OUTFILENAME'];
+$this_file_in = $_ENV['PHP_INFILENAME'];
+
+
+
+if(file_exists('../'.$this_file_in))
+    echo <<<END
+    <h4><a href="../$this_file_out">back
+        to parent directory</a></h4>
+END;
+?>
+
+
+    <!-- container div-->
+    <div>
+
+
+
+<?php
+
+$got_some = false;
+
+function listFiles($type, $files)
+{
+    global $got_some;
+
+    if(count($files) < 1)
+        return;
+
+    $got_some = true;
+
+    echo <<<END
+    <div class=index>
+      <h4 class=index>$type</h4>
+      <ul class=index>
+
+END;
+
+    foreach($files as $f)
+        echo "      <li class=index><a href=\"$f\">$f</a></li>\n";
+
+    echo "    </ul>\n    </div>\n\n";
+}
+
+// installed file types are
+// .html .htm .js .css .php .txt
+
+// get .html files
+
+function printFilesType($type_name, $types)
+{
+    global $this_file_out, $stderr;
+
+    $t0 = '.'.$type_name;
+    $ret = [];
+    foreach($types as $t)
+    {
+        $typesi[] = $t;
+        $typesi[] = $t.'.in';
+    }
+
+    foreach($typesi as $t)
+    {
+        $g = glob('*.'.$t);
+        if($g)
+            $ret = array_merge($ret,
+                preg_replace('/\.'.$t.'$/', $t0, $g));
+    }
+
+    if(count($ret) < 1) return;
+
+    $ret = array_unique($ret);
+
+    if(($k = array_search($this_file_out, $ret)) !== false)
+        unset($ret[$k]);
+
+    listFiles($type_name, $ret);
+}
+
+function privateFilterOut($val)
+{
+    if(preg_match('/^private\//', $val))
+        return false;
+    return true;
+}
+
+function printSubDirs()
+{
+    global $this_file_in;
+
+    $dirs = glob('*/'.$this_file_in);
+    if(!$dirs or count($dirs) < 1)
+        return;
+    $dirs = preg_replace('/\.phtml$/', '.html', $dirs);
+    if(!$dirs or count($dirs) < 1)
+        return;
+    $dirs = array_filter($dirs, 'privateFilterOut');
+
+    if($dirs and count($dirs) > 0)
+        listFiles('subdirectory index', $dirs);
+}
+
+printSubDirs();
+
+printFilesType('html', ['html', 'chtml', 'phtml']);
+printFilesType('htm', ['htm', 'chtm', 'phtm']);
+printFilesType('php', ['php', 'cphp', 'pphp']);
+printFilesType('js', ['js', 'cjs', 'pjs']);
+printFilesType('css', ['css', 'ccss', 'pcss']);
+printFilesType('txt', ['txt', 'ctxt']);
+
+if($got_some === false)
+{
+?>
+
+<div>
+<div class=index>
+<p>There are no files to list in this directory,
+other than the index file you're browsing now.</p>
+</div>
+</div>
+
+<?php
+}
+?>
+    </div>
+
+</body>
+</html>

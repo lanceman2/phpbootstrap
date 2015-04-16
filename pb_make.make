@@ -1,9 +1,4 @@
-#####################################################################
-# This file is part of the phpbootstrap package build system
-#
 # This is a GNU make file which uses GNU make extensions
-#
-
 
 ifneq ($(strip $(srcdir)),.)
   VPATH := .:$(srcdir)
@@ -156,19 +151,10 @@ endif # ifdef installdir
 
 
 clean_files := $(sort $(built) $(wildcard *.d))
-distclean_files := $(clean_files) GNUmakefile
-
-ifeq ($(strip $(top_builddir)),.)
 distclean_files := $(strip\
- $(distclean_files)\
- @pb_build_prefix@pb_auto_prepend.ph\
- @pb_build_prefix@pb_auto_append.ph\
- @pb_build_prefix@pb_php_compile\
- @pb_build_prefix@pb_cat_compile\
- @pb_build_prefix@pb_config\
- $(pre_install)\
- $(post_install))
-endif
+ $(clean_files)\
+ GNUmakefile\
+ $(add_distclean))
 
 
 php_compile := $(top_builddir)/@pb_build_prefix@pb_php_compile
@@ -192,12 +178,8 @@ endif
 
 
 
-
 .DEFAULT_GOAL = build
 
-#####################################################################
-# END VARIABLE DEFINITIONS
-#####################################################################
 
 #####################################################################
 # BEGIN RULES    How we do stuff.  There are some rules above :(
@@ -250,25 +232,25 @@ include $(wildcard *.d)
 %.html: %.md
 	marked $< > $@
 %.php: %.pphp
-	$(php_compile) $< $@
+	$(php_compile) $< $@ $(url_path_dir)
 %.php: %.cphp
 	$(cat_compile) $< $@
 %.html: %.phtml
-	$(php_compile) $< $@
+	$(php_compile) $< $@ $(url_path_dir)
 %.html: %.chtml
 	$(cat_compile) $< $@
 %.htm: %.phtm
-	$(php_compile) $< $@
+	$(php_compile) $< $@ $(url_path_dir)
 %.htm: %.chtm
 	$(cat_compile) $< $@
 %.js: %.pjs
-	$(php_compile) $< $@
+	$(php_compile) $< $@ $(url_path_dir)
 %.jsp: %.pjsp
-	$(php_compile) $< $@
+	$(php_compile) $< $@ $(url_path_dir)
 %.css: %.pcss
-	$(php_compile) $< $@
+	$(php_compile) $< $@ $(url_path_dir)
 %.cs: %.pcs
-	$(php_compile) $< $@
+	$(php_compile) $< $@ $(url_path_dir)
 %.js: %.cjs
 	$(cat_compile) $< $@
 %.jsp: %.cjsp
@@ -380,4 +362,3 @@ build_rec clean_rec _debug_rec distclean_rec install_rec:
 	    $(MAKE) -C $$d $(patsubst %_rec,%_do,$@) || exit 1 ;\
 	  fi ; done
 endif
-

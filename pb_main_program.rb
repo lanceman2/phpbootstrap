@@ -27,12 +27,18 @@ def print_gen(path)
 
 end
 
-def check_arg(name, arg, usage)
+# TODO: this interface sucks
+def check_arg(name, arg, conf = nil)
 
     if arg == name
         arg = ARGV.shift
-        usage unless arg
-        $argOpts += ' ' + arg
+        unless arg
+            if conf
+                usage(conf)
+            else
+                bs_usage
+            end
+        end
         return arg
     end
 
@@ -42,7 +48,7 @@ def check_arg(name, arg, usage)
         return arg.sub(regexp, '')
     end
 
-    return false
+    false
 end
 
 
@@ -94,7 +100,7 @@ if File.basename($script_path) == 'phpbootstrap'
         if arg =~ /(--version|-V)/
             puts $pb_version
             exit
-        elsif ret = check_arg('--name', arg, bs_usage)
+        elsif ret = check_arg('--name', arg)
             package_name = ret
         else
             bs_usage
@@ -328,7 +334,7 @@ def print_make_file(buildpath, conf, top_builddir, rel_srcdir, data)
             vpath = '# VPATH not set'
         end
     else
-        top_srcdir = conf[:top_src_fullpath] # full path when not in src dirs
+        top_srcdir = conf[:top_src_fullpath] # full path when not in src dir
         if top_builddir == '.'
             srcdir = top_srcdir
         else
@@ -341,29 +347,57 @@ def print_make_file(buildpath, conf, top_builddir, rel_srcdir, data)
         srcdir_equals_builddir = "# srcdir_equals_builddir = false\n"
     end
 
-
+    # default is not accessible by web
+    url_path_dir = '# url_path_dir is not set; this directory is not served' 
+    
     if rel_srcdir =~ conf[:rel_include_dir_regrex]
         installdir = false
     elsif rel_srcdir =~ /^private($|\/)/
         installdir = rel_srcdir.sub(/^private/,conf[:private])
-    elsif conf[:public_in_topsrc]
+    elsif conf[:public_in_topsrc] or rel_srcdir =~ /^public($|\/)/
         if rel_srcdir != '.'
             installdir = conf[:public] + '/' + rel_srcdir
+            url_path_dir = 'url_path_dir := /' + rel_srcdir
         else
             installdir = conf[:public]
+            url_path_dir = 'url_path_dir := /'
         end
-    elsif rel_srcdir =~ /^public($|\/)/
-        # public | public/foo
-        installdir = conf[:public]
-        installdir += '/' + rel_srcdir if rel_srcdir != '.'
     else
         installdir = false
     end
 
+    add_distclean = ''
+
+    if top_builddir == '.'
+        add_distclean += "\\\n $(pre_install)\\\n $(post_install)"
+        [
+            'pb_auto_prepend.ph', 'pb_auto_append.ph',
+            'pb_php_compile', 'pb_cat_compile',
+            'pb_config', 'pb_index.cs'
+        ].each do |pb|
+            add_distclean += "\\\n " + conf[:sub][:pb_build_prefix] + pb
+        end
+    end
+
+    # We generate an array list of directories that are
+    # seem by the web browsers from the path in the URL.
+    dirs = []
+
     if installdir
+        unless rel_srcdir =~ /^private($|\/)/
+            # This dir may be seem on the web
+            dirs.push buildpath
+            add_distclean += "\\\n pb_debug_index.phtml" if conf[:sub][:debug]
+        end
         installdir = "installdir := #{installdir}"
     else
         installdir = "# installdir is not defined for this directory"
+    end
+    
+    if add_distclean.length > 0
+        add_distclean = 'add_distclean =' + add_distclean
+    else
+        add_distclean = '# add_distclean is not defined'
     end
 
 
@@ -372,6 +406,8 @@ def print_make_file(buildpath, conf, top_builddir, rel_srcdir, data)
     f = File.open(path , 'w')
     f.print <<-END
 # #{conf[:sub][:generated_file_string]}
+#
+# This is a GNU make file which uses GNU make extensions
 
 top_builddir := #{top_builddir}
 
@@ -384,6 +420,10 @@ srcdir := #{srcdir}
 #{vpath}
 
 #{srcdir_equals_builddir}
+
+#{add_distclean}
+
+#{url_path_dir}
 
     END
 
@@ -460,8 +500,9 @@ test__subdirs_FASDiefjmzzz:
         Dir.chdir pwd
     end
 
-    return unless subdirs.length > 0
+    return dirs unless subdirs.length > 0
 
+    # go to the next directory
     if top_builddir == '.'
         top_builddir = '..'
     else
@@ -480,8 +521,10 @@ test__subdirs_FASDiefjmzzz:
         else
             rel = dir
         end
-        print_make_file(bld, conf, top_builddir, rel, data)
+        dirs.concat print_make_file(bld, conf, top_builddir, rel, data)
     end
+
+    dirs
 
 end
 
@@ -526,24 +569,23 @@ def check_gen_p_install_script(name, conf)
 end
 
 
-def get_DATA(conf)
+def get_DATA(conf, c = '#', e = '', header = true)
 
-    # get the #!/bin/STUFF first
+    # get the #!/bin/STUFF or <?php /* first
 
-    data = <<-END
+    data = ''
+    data = <<-END if header
 #{DATA.gets}
-#
-#############################
-# #{conf[:sub][:generated_file_string]}
-############################
-
+#{c} -------------------------------------- #{e}
+#{c} #{conf[:sub][:generated_file_string]} #{e}
+#{c} -------------------------------------- #{e}
     END
 
     DATA.each_line do |line|
         return data if line =~ $pb_file_seperator_regrex
         data += sub_line(conf[:sub], line)
     end
-    return data
+    data
 end
 
 
@@ -560,20 +602,38 @@ def configure (conf)
 
     gen_pb_config conf
 
-    print_make_file('.', conf, '.', '.', get_DATA(conf))
+    dirs = print_make_file('.', conf, '.', '.', get_DATA(conf, '#', '', false))
 
     gen_pb_build_file('pb_php_compile', get_DATA(conf), conf, true)
 
     gen_pb_build_file('pb_cat_compile', get_DATA(conf), conf, true)
 
-    gen_pb_build_file('pb_auto_prepend.ph', get_DATA(conf).strip!, conf)
+    gen_pb_build_file('pb_auto_prepend.ph', get_DATA(conf, '/*', '*/').strip!, conf)
 
-    gen_pb_build_file('pb_auto_append.ph',  get_DATA(conf).strip!, conf)
+    gen_pb_build_file('pb_auto_append.ph',  get_DATA(conf, '/*', '*/').strip!, conf)
+
+    gen_pb_build_file('pb_index.cs', get_DATA(conf, '/*', '*/', false), conf)
 
     check_gen_p_install_script('pre_install', conf)
     
     check_gen_p_install_script('post_install', conf)
+
+    if conf[:sub][:debug] and dirs.length > 0
+        data = get_DATA(conf, '/*', '*/')
+        dirs.each do |dir|
+            if dir != '.'
+                path = Dir.pwd + '/' + dir + '/pb_debug_index.phtml'
+            else
+                path = Dir.pwd + '/pb_debug_index.phtml'
+            end
+            print_gen path
+            p = File.open(path, 'w')
+            p.write data
+            p.close
+        end
+    end
 end
+
 
 # TODO: use this or remove it.
 def help_printOpt(f, pre, text)
@@ -663,7 +723,7 @@ def which(path)
             return p
         end
     end
-    return path
+    path
 end
 
 
@@ -673,7 +733,7 @@ def parse_args
     conf = {}
     conf[:sub] = {}
     conf[:sub][:php_path] = which 'php'
-    conf[:sub][:yui_path] = which 'yui'
+    conf[:sub][:yui_path] = which 'yui-compressor'
     conf[:sub][:js_compile] = false
     conf[:sub][:css_compile] = false
     # default debug value # TODO change this
@@ -692,18 +752,18 @@ def parse_args
         if  arg =~ /(--version|-V)/
             puts $pb_version
             exit
-        elsif ret = check_arg('--public', arg, usage)
+        elsif ret = check_arg('--public', arg, conf)
             conf[:public] = File.expand_path ret
-        elsif ret = check_arg('--private', arg, usage)
+        elsif ret = check_arg('--private', arg, conf)
             conf[:private] = File.expand_path ret
-        elsif ret = check_arg('--web-user', arg, usage)
+        elsif ret = check_arg('--web-user', arg, conf)
             conf[:web_user] = File.expand_path ret
-        elsif ret = check_arg('--prefix', arg, usage)
+        elsif ret = check_arg('--prefix', arg, conf)
             ret = File.expand_path ret
             conf[:public] = ret + '/public'
             conf[:private] = ret + '/private'
-        elsif ret = check_arg('--debug', arg, usage)
-            ret.downcase!
+        elsif ret = check_arg('--debug', arg, conf)
+            ret = ret.downcase
             if conf[:sub][:debug] # default is true
                 conf[:sub][:debug] = 'false' if ret =~ /(^n|^f|^0|^of)/
             else
@@ -712,6 +772,7 @@ def parse_args
         else
             usage conf
         end
+        arg = ARGV.shift
     end
 
     conf[:top_src_fullpath] = File.dirname $script_path
