@@ -10,7 +10,6 @@ function pb_finish()
         array_merge(
             $pb_loaded_src_files, get_included_files()
         ), SORT_STRING);
-    unset($pb_loaded_src_files);
     foreach($all_src_files as &$file)
         $file = basename($file);
     unset($file);

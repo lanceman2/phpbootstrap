@@ -1,10 +1,10 @@
 <?php /*pb_debug_index.phtml*/
 ?><!DOCTYPE html>
-<html>
+<html lang=en>
 <head>
-    <title><?php echo getcwd(); ?></title>
+    <title><?php echo $_ENV['PHP_URLPATHDIR']; ?></title>
     <style>
-<?php readfile('pb_index.cs', true /*use include path*/); ?>
+        <?php pb_insertFile('pb_index.cs'); ?>
     </style>
 </head>
 <body class=index>
@@ -12,8 +12,8 @@
     <div style="font-size:70%;">This
         page is for debugging, and should not be
         seen on a production web server on the
-        Internet.  You may be able to use the <a href='.'>browsers
-        local file indexing</a> too.</div>
+        Internet.  You may be able to use the <a
+        href='.'>browsers local file indexing</a> too.</div>
 
     <div style="margin:15px;font-size:120%;">url directory: <span
         style="font-weight:bold;"><?php
