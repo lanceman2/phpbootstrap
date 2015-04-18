@@ -35,7 +35,8 @@ function pb_finish()
     if($out === FALSE)
         trigger_error('fopen("'.$filename.'", \'w\') failed', E_USER_ERROR);
 
-    fwrite($out, "# this is a generated make depend file\n\n".
+    fwrite($out, "## @generated_file_string@\n".
+        "# this is a make depend file\n".
         $_ENV['PHP_OUTFILENAME'].':');
 
     foreach($all_src_files as $file)

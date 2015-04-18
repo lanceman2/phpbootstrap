@@ -1,9 +1,5 @@
 # This is a GNU make file which uses GNU make extensions
 
-ifneq ($(strip $(srcdir)),.)
-  VPATH := .:$(srcdir)
-endif
-
 ifdef SUBDIRS
   subdirs := $(strip $(SUBDIRS))
   ifeq ($(strip subdirs),)
@@ -307,6 +303,7 @@ _debug_do:
 	@echo "build_rec=$(build_rec)"
 	@echo "built_in_any=$(built_in_any)"
 	@echo "srcdir=$(srcdir)"
+	@echo "VPATH=$(VPATH)"
 
 
 build_norec build_do: $(built)

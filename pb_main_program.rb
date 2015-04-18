@@ -10,10 +10,40 @@ $script_path.freeze
 $generated_file_magic_string = 'This is a phpbootstrap generated file'
 $generated_file_magic_string.freeze
 
+
+# GOOD TO KNOW: This script never changes the working directory
+
+
 ###########################################################################
 # Less code without OOP.  Today we say fuck OOP, for tomorrow we may drown
 # in spaghetti code.
 #
+
+# We need this sub_line() in more than one ruby file, so we do a little
+# ruby meta-programming here, so that this function is the same for this
+# and another ruby script.
+
+$def_sub_line = <<END
+def sub_line(pkg, line)
+    pkg.each do |k,v|
+        if v.instance_of? String
+            val = v
+        elsif v.instance_of? Array
+            val = v.to_s
+        else # boolean
+            val = ((v)?"true":"false")
+        end
+        line.gsub!("@" + k.to_s + "@", val)
+    end
+    line
+end
+END
+
+
+# define this sub_line() function here
+eval($def_sub_line)
+# and we'll use it in another place too
+
 
 
 def print_gen(path)
@@ -23,7 +53,9 @@ def print_gen(path)
     else
         $stderr.print '  '
     end
-    $stderr.print 'generating: ' + path + "\n"
+    # We got tired of seeing these long fucking path strings
+    p = path.sub(Regexp.new('^' + Regexp.escape(Dir.pwd) + '\/'), '')
+    $stderr.print 'generating: ' + p + "\n"
 
 end
 
@@ -144,6 +176,8 @@ $pb_package_name = '#{package_name}'
 end
 
 
+
+
 def dumpFile(in_path, out_file, conf, required = true)
 
     if required or File.exist? in_path
@@ -163,6 +197,9 @@ def gen_pb_config(conf)
     path = Dir.pwd + '/' + conf[:sub][:pb_build_prefix] + 'pb_config'
     print_gen path
     f = File.open(path , 'w')
+
+    # Ain't meta-programming fun!  Ruby's reflexivity.
+
     f.print <<-END
 #!/usr/bin/ruby -w
 #############################################
@@ -222,51 +259,40 @@ begin
 
   }
 
-  def sub_line(pkg, line, out)
-    # this needs to match code at xxZZconf in pb_main_program.rb
-    pkg.each do |k,v|
-        if v.instance_of? String
-            val = v
-        elsif v.instance_of? Array
-            if v[0].instance_of? String
-                val = v[0]
-            else
-                val = ((v[0])?'true':'false')
-            end
-        else
-            val = ((v)?'true':'false')
-        end
-        line.gsub!('@' + k.to_s + '@', val)
-    end
-    out.write line
-  end
+# define the sub_line() function here
+#{$def_sub_line}
+
+
+def write_line(pkg, l, out)
+    out.write sub_line(pkg, l)
+end
 
 
   if outpath and not ARGV[2]
     l = fin.gets
     suffix = outpath.gsub(/^.*\\./, '')
     if suffix =~ /^(ht|htm|html)$/ and l =~ /^<!DOCTYPE /
-      sub_line(pkg, l, out)
+      write_line(pkg, l, out)
       out.write "<!-- \#{pkg[:generated_file_string]} -->\\n"
     elsif suffix =~ /^(ht|htm|html)$/
       out.write "<!-- \#{pkg[:generated_file_string]} -->\\n"
-      sub_line(pkg, l, out) if l
+      write_line(pkg, l, out) if l
     elsif suffix =~ /^(pphp|php|phtml|ph|phd|pjs|pcss|pjsp|pcs)$/
       out.write "<?php\\n/* \#{pkg[:generated_file_string]}*/\\n ?>"
-      sub_line(pkg, l, out) if l
+      write_line(pkg, l, out) if l
     elsif suffix =~ /^(js|jsp|css|cs)$/
       out.write "/* \#{pkg[:generated_file_string]} */\\n"
-      sub_line(pkg, l, out) if l
+      write_line(pkg, l, out) if l
     elsif suffix == 'txt'
       out.write "\# \#{pkg[:generated_file_string]}\\n"
-      sub_line(pkg, l, out)
+      write_line(pkg, l, out)
     elsif suffix =~ /^(cjs|cjsp|ccss|ccs|cht|chtm|chtml)$/
       out.write "# \#{pkg[:generated_file_string]}\\n"
-      sub_line(pkg, l, out) if l
+      write_line(pkg, l, out) if l
     else # for bash of ruby script file 
       FileUtils.chmod 0755, outpath
       if l
-        sub_line(pkg, l, out)
+        write_line(pkg, l, out)
       else
         out.write "#!/bin/bash\\n"
       end
@@ -275,7 +301,7 @@ begin
   end
 
   while l = fin.gets
-    sub_line(pkg, l, out)
+    write_line(pkg, l, out)
   end
 
 rescue Exception => e
@@ -314,56 +340,63 @@ def gen_pb_build_file(name, data, conf, is_exe = false)
 end
 
 
-# buildpath is the dir where to write GNUmakefile
+# buildpath is the dir where to write GNUmakefile, like . or 'foo' or
+# 'foo/bar' which is a relative path from the top of the source directory
+# tree which is the same in the build directory tree.
 # top_builddir is a relative path like . or .. or ../..
-# rel_srcdir is path relative to the top source dir like '.' or 'foo' or 'foo/bar'
-def print_make_file(buildpath, conf, top_builddir, rel_srcdir, data)
+def print_make_file(buildpath, conf, top_builddir, data)
 
     unless File.exist? buildpath
         $stderr.print 'making directory: ' + buildpath + "/\n"
         FileUtils.mkdir_p buildpath
     end
 
+    vpath = '.'
     if conf[:srcdir_equals_builddir]
         top_srcdir = top_builddir # relative path
         srcdir = '.'
         srcdir_equals_builddir = "srcdir_equals_builddir = true\n"
-        if rel_srcdir != conf[:sub][:rel_include_dir]
-            vpath = 'VPATH = .:' + top_srcdir + '/' + conf[:sub][:rel_include_dir]
-        else
-            vpath = '# VPATH not set'
+        if buildpath != conf[:sub][:rel_include_dir]
+            vpath += ':' + top_srcdir + '/' + conf[:sub][:rel_include_dir]
         end
     else
         top_srcdir = conf[:top_src_fullpath] # full path when not in src dir
         if top_builddir == '.'
             srcdir = top_srcdir
         else
-            srcdir = top_srcdir + '/' + rel_srcdir
+            srcdir = top_srcdir + '/' + buildpath
         end
-        vpath = 'VPATH = .:' +
+        vpath += ':' +
             srcdir + ':' + 
             top_builddir + '/' + conf[:sub][:rel_include_dir] + ':' +
             top_srcdir + '/' + conf[:sub][:rel_include_dir]
         srcdir_equals_builddir = "# srcdir_equals_builddir = false\n"
     end
+    vpath += ':' + conf[:sub][:pb_build_prefix]
 
     # default is not accessible by web
-    url_path_dir = '# url_path_dir is not set; this directory is not served' 
-    
-    if rel_srcdir =~ conf[:rel_include_dir_regrex]
-        installdir = false
-    elsif rel_srcdir =~ /^private($|\/)/
-        installdir = rel_srcdir.sub(/^private/,conf[:private])
-    elsif conf[:public_in_topsrc] or rel_srcdir =~ /^public($|\/)/
-        if rel_srcdir != '.'
-            installdir = conf[:public] + '/' + rel_srcdir
-            url_path_dir = 'url_path_dir := /' + rel_srcdir
+    url_path_dir = '# url_path_dir is not set; this directory is not served'
+
+    if buildpath =~ conf[:rel_include_dir_regrex]
+        installdir = false # nothing in this dir is installed
+    elsif buildpath =~ /^private($|\/)/
+        # installed in private
+        installdir = buildpath.sub(/^private/,conf[:private])
+    elsif conf[:public_in_topsrc] or buildpath =~ /^public($|\/)/
+        # installed in public and served to web
+        if buildpath != '.'
+            installdir = conf[:public] + '/' + buildpath
+            url_path_dir = 'url_path_dir := /' + buildpath
         else
+            conf[:top_public_dir] = buildpath
             installdir = conf[:public]
             url_path_dir = 'url_path_dir := /'
         end
+        unless conf[:top_public_dir]
+            conf[:top_public_dir] = buildpath
+        end
     else
-        installdir = false
+        installdir = false # nothing in this dir is installed
     end
 
     add_distclean = ''
@@ -384,7 +417,7 @@ def print_make_file(buildpath, conf, top_builddir, rel_srcdir, data)
     dirs = []
 
     if installdir
-        unless rel_srcdir =~ /^private($|\/)/
+        unless buildpath =~ /^private($|\/)/
             # This dir may be seem on the web
             dirs.push buildpath
             add_distclean += "\\\n pb_debug_index.phtml" if conf[:sub][:debug]
@@ -392,6 +425,10 @@ def print_make_file(buildpath, conf, top_builddir, rel_srcdir, data)
         installdir = "installdir := #{installdir}"
     else
         installdir = "# installdir is not defined for this directory"
+    end
+
+    if installdir and buildpath == '.' and conf[:sub][:debug]
+        add_distclean += "\\\n pb_debug_fullindex.phtml"
     end
     
     if add_distclean.length > 0
@@ -417,7 +454,7 @@ srcdir := #{srcdir}
 
 #{installdir}
 
-#{vpath}
+VPATH = #{vpath}
 
 #{srcdir_equals_builddir}
 
@@ -427,14 +464,13 @@ srcdir := #{srcdir}
 
     END
 
-
-    if rel_srcdir != '.'
-        bp_make_path = top_srcdir + '/' + rel_srcdir + '/pb.make'
+    if buildpath != '.'
+        bp_make_path = conf[:top_src_fullpath] + '/' + buildpath + '/pb.make'
     else
-        bp_make_path = top_srcdir + '/pb.make'
+        bp_make_path = conf[:top_src_fullpath] + '/pb.make'
     end
-    dumpFile(bp_make_path, f, conf, false)
 
+    dumpFile(bp_make_path, f, conf, false)
 
     if File.exist? conf[:top_src_fullpath] + '/pre_install'
         f.print <<-END
@@ -482,22 +518,24 @@ test__subdirs_FASDiefjmzzz:
         END
         f.write "\t@echo \"$(strip $(SUBDIRS))\"\n"
         f.close
-        #$stderr.print "running: make test__subdirs_FASDiefjmzzz --silent\n"
-        pwd = Dir.pwd
-        Dir.chdir buildpath
-        subdirs = %x[make -C #{buildpath} test__subdirs_FASDiefjmzzz --silent -f GNUmakefile.tmp_zZ].split
+        run = "make -C #{buildpath} --silent -f GNUmakefile.tmp_zZ " +
+            "test__subdirs_FASDiefjmzzz"
+        subdirs = %x[#{run}].split
         # bug check
         if subdirs =~ /Entering directory/
             $stderr.print "running makitems.html.gze spewed badly again\n"
             exit 1
         elsif not $?.success?
-            $stderr.print "  configure failed: running make failed\n"
+            $stderr.print <<-END
+  configure failed: running:
+    #{run}
+  FAILED
+            END
             exit 1
         end
 
         File.unlink gpath
         ##$stderr.print 'subdirs ="' + subdirs.to_s + "\"\n"
-        Dir.chdir pwd
     end
 
     return dirs unless subdirs.length > 0
@@ -516,36 +554,11 @@ test__subdirs_FASDiefjmzzz:
         else
             bld = dir
         end
-        if rel_srcdir != '.'
-            rel = rel_srcdir + '/' + dir
-        else
-            rel = dir
-        end
-        dirs.concat print_make_file(bld, conf, top_builddir, rel, data)
+        dirs.concat print_make_file(bld, conf, top_builddir, data)
     end
 
     dirs
 
-end
-
-def sub_line(pkg, line)
-
-    # this needs to match code at xxZZconf in this file
-    pkg.each do |k,v|
-        if v.instance_of? String
-            val = v
-        elsif v.instance_of? Array
-            if v[0].instance_of? String
-                val = v[0]
-            else
-                val = ((v[0])?'true':'false')
-            end
-        else # boolean
-            val = ((v)?'true':'false')
-        end
-        line.gsub!('@' + k.to_s + '@', val)
-    end
-    line
 end
 
 
@@ -555,7 +568,7 @@ def check_gen_p_install_script(name, conf)
     inPath = conf[:top_src_fullpath] + '/' + name
  
     if File.exist? inPath
-        outPath = conf[:sub][:pb_build_prefix] + 'pb_' + name
+        outPath = Dir.pwd + '/' + conf[:sub][:pb_build_prefix] + 'pb_' + name
         config = conf[:sub][:pb_build_prefix] + 'pb_config'
         print_gen outPath
         f = IO.popen(config + ' - ' + outPath, 'w')
@@ -575,10 +588,9 @@ def get_DATA(conf, c = '#', e = '', header = true)
 
     data = ''
     data = <<-END if header
-#{DATA.gets}
-#{c} -------------------------------------- #{e}
+#{DATA.gets}#{c} ------------------------------------------------- #{e}
 #{c} #{conf[:sub][:generated_file_string]} #{e}
-#{c} -------------------------------------- #{e}
+#{c} ------------------------------------------------- #{e}
     END
 
     DATA.each_line do |line|
@@ -591,6 +603,8 @@ end
 
 def configure (conf)
 
+    $stderr.print "(Re)Creating the following files in: #{Dir.pwd}/\n"
+
     if conf[:sub][:pb_build_prefix] and
         conf[:sub][:pb_build_prefix].length > 0
         pb_bld_dir = Dir.pwd + '/' + conf[:sub][:pb_build_prefix]
@@ -600,9 +614,10 @@ def configure (conf)
         end
     end
 
-    gen_pb_config conf
+    public_dirs = print_make_file('.', conf, '.', get_DATA(conf, '#', '', false))
+    conf[:sub][:public_dirs] = public_dirs
 
-    dirs = print_make_file('.', conf, '.', '.', get_DATA(conf, '#', '', false))
+    gen_pb_config conf
 
     gen_pb_build_file('pb_php_compile', get_DATA(conf), conf, true)
 
@@ -618,13 +633,26 @@ def configure (conf)
     
     check_gen_p_install_script('post_install', conf)
 
-    if conf[:sub][:debug] and dirs.length > 0
+    if conf[:sub][:debug] and public_dirs.length > 0
         data = get_DATA(conf, '/*', '*/')
-        dirs.each do |dir|
+        public_dirs.each do |dir|
             if dir != '.'
-                path = Dir.pwd + '/' + dir + '/pb_debug_index.phtml'
+                path = dir + '/pb_debug_index.phtml'
             else
-                path = Dir.pwd + '/pb_debug_index.phtml'
+                path = 'pb_debug_index.phtml'
+            end
+            print_gen path
+            p = File.open(path, 'w')
+            p.write data
+            p.close
+        end
+        if conf[:top_public_dir]
+            dir = conf[:top_public_dir]
+            data = get_DATA(conf, '/*', '*/')
+            if dir != '.'
+                path = dir + '/pb_debug_fullindex.phtml'
+            else
+                path = 'pb_debug_fullindex.phtml'
             end
             print_gen path
             p = File.open(path, 'w')
@@ -812,7 +840,8 @@ def parse_args
     conf[:sub][:css_compile] = conf[:sub][:yui_path] +\
         ' --type css --line-break 50' unless conf[:sub][:css_compile]
 
-    conf[:sub][:generated_file_string] = $generated_file_magic_string
+    conf[:sub][:generated_file_string] = $generated_file_magic_string +
+        ' debug=' + conf[:sub][:debug].to_s
     conf[:sub][:package_name] = $pb_package_name
     # pb_build_prefix must be relative a path
     conf[:sub][:pb_build_prefix] = 'pb_build/'

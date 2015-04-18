@@ -14,9 +14,10 @@ function pb_errorHandler($errno, $errstr, $errfile, $errline)
     global $stderr;
 
     /* This should print a stack trace */
-    fwrite($stderr, 'PHP compile ERROR('.$errno.')'.
-        ':'.$errstr. ' file:'.$errfile.
-        ':'.$errline."\n");
+    fwrite($stderr, '  PHP compile ERROR('.$errno.')'.
+        ':'.$errstr. "\n  file:".$errfile.
+        ':'.$errline."\n  PHP BACKTRACE:\n");
+    fwrite($stderr, var_export(debug_backtrace(), true));
     exit(1); // will stop make
 }
 
@@ -27,6 +28,25 @@ function pb_fail($msg = 'error')
     trigger_error($msg, E_USER_ERROR);
     // We should not get here.
     exit(1);
+}
+
+if($pb_debug)
+{
+    // debug spew
+    function pb_spew($str)
+    {
+        global $stderr;
+        fwrite($stderr, $str);
+    }
+}
+else
+{
+    // no debug spew
+    function pb_spew($str)
+    {
+        global $stderr;
+        fwrite($stderr, $str);
+    }
 }
 
 /* This does a readfile(file) using PHP include path and adds the file

@@ -65,7 +65,7 @@ def find_path(path)
         if File.exist? p
             return p
         end
-        $stderr.print "p=" + p + "\n"
+        #$stderr.print "p=" + p + "\n"
     end
 
 

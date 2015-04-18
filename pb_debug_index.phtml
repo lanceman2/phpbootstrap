@@ -64,11 +64,6 @@ END;
     echo "    </ul>\n    </div>\n\n";
 }
 
-// installed file types are
-// .html .htm .js .css .php .txt
-
-// get .html files
-
 function printFilesType($type_name, $types)
 {
     global $this_file_out, $stderr;
@@ -123,6 +118,10 @@ function printSubDirs()
 }
 
 printSubDirs();
+
+// installed file types are
+// .html .htm .js .css .php .txt
+
 
 printFilesType('html', ['html', 'chtml', 'phtml']);
 printFilesType('htm', ['htm', 'chtm', 'phtm']);
