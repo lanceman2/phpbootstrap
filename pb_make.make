@@ -21,6 +21,9 @@ built_php_htm = $(sort \
 built_php_php = $(sort \
  $(patsubst $(srcdir)/%.pphp, %.php, $(wildcard $(srcdir)/*.pphp))\
  $(patsubst $(srcdir)/%.pphp.in, %.php, $(wildcard $(srcdir)/*.pphp.in)))
+ifeq ($(top_builddir),.)
+  built_php_php := $(sort $(built_php_php) pb_fullindex.php)
+endif
 built_php_js = $(sort \
  $(patsubst $(srcdir)/%.pjs, %.js, $(wildcard $(srcdir)/*.pjs))\
  $(patsubst $(srcdir)/%.pjs.in, %.js, $(wildcard $(srcdir)/*.pjs.in)))
@@ -33,7 +36,7 @@ built_php_jsp = $(sort \
 built_php_cs = $(sort \
  $(patsubst $(srcdir)/%.pcs, %.cs, $(wildcard $(srcdir)/*.pcs))\
  $(patsubst $(srcdir)/%.pcs.in, %.cs, $(wildcard $(srcdir)/*.pcs.in)))
-built_php = $(strip\
+built_php := $(strip\
  $(built_php_html)\
  $(built_php_htm)\
  $(built_php_php)\
@@ -316,9 +319,9 @@ ifdef pre_install
 	$(pre_install)
 endif
 endif
-ifdef installed
 	if [ ! -d $(installdir) ] ; then\
 	    mkdir -p $(installdir) ; fi
+ifdef installed
 	cp $(installed) $(installdir)
 endif
 
