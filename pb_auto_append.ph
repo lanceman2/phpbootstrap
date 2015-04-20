@@ -1,4 +1,4 @@
-<?php /**pb_auto_append.ph**/
+<?php
 
 /* This file is sourced after all others at pb_php_compile time */
 

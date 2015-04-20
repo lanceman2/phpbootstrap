@@ -33,7 +33,7 @@ def sub_line(pkg, line)
         else # boolean
             val = ((v)?"true":"false")
         end
-        line.gsub!("@" + k.to_s + "@", val)
+        line = line.gsub("@" + k.to_s + "@", val)
     end
     line
 end
@@ -174,7 +174,6 @@ $pb_package_name = '#{package_name}'
     FileUtils.chmod 0755, 'configure'
     exit 0
 end
-
 
 
 
@@ -329,9 +328,10 @@ end
 
 
 
-def gen_pb_build_file(name, data, conf, is_exe = false)
+def gen_pb_file(name, data, conf, is_exe = false,
+                pre = conf[:sub][:pb_build_prefix])
 
-    path =  Dir.pwd + '/' + conf[:sub][:pb_build_prefix] + name
+    path =  Dir.pwd + '/' + pre + name
     print_gen path
     p = File.open(path, 'w')
     p.write data
@@ -372,7 +372,7 @@ def print_make_file(buildpath, conf, top_builddir, data)
             top_srcdir + '/' + conf[:sub][:rel_include_dir]
         srcdir_equals_builddir = "# srcdir_equals_builddir = false\n"
     end
-    vpath += ':' + conf[:sub][:pb_build_prefix]
+    vpath += ':' + top_builddir + '/' + conf[:sub][:pb_build_prefix].sub(/\/$/, '')
 
     # default is not accessible by web
     url_path_dir = '# url_path_dir is not set; this directory is not served'
@@ -405,8 +405,10 @@ def print_make_file(buildpath, conf, top_builddir, data)
         add_distclean += "\\\n $(pre_install)\\\n $(post_install)"
         [
             'pb_auto_prepend.ph', 'pb_auto_append.ph',
+            'pb_utils.ph',
             'pb_php_compile', 'pb_cat_compile',
-            'pb_config', 'pb_index.cs'
+            'pb_config',
+            'pb_fullindex.cs'
         ].each do |pb|
             add_distclean += "\\\n " + conf[:sub][:pb_build_prefix] + pb
         end
@@ -420,17 +422,16 @@ def print_make_file(buildpath, conf, top_builddir, data)
         unless buildpath =~ /^private($|\/)/
             # This dir may be seem on the web
             dirs.push buildpath
-            add_distclean += "\\\n pb_debug_index.phtml" if conf[:sub][:debug]
         end
         installdir = "installdir := #{installdir}"
     else
         installdir = "# installdir is not defined for this directory"
     end
 
-    if installdir and buildpath == '.' and conf[:sub][:debug]
-        add_distclean += "\\\n pb_debug_fullindex.phtml"
+    if installdir and buildpath == '.'
+        add_distclean += "\\\n pb_fullindex.pphp"
     end
-    
+
     if add_distclean.length > 0
         add_distclean = 'add_distclean =' + add_distclean
     else
@@ -582,16 +583,54 @@ def check_gen_p_install_script(name, conf)
 end
 
 
-def get_DATA(conf, c = '#', e = '', header = true)
+def get_DATA(conf, type, header = true)
 
-    # get the #!/bin/STUFF or <?php /* first
+    pre = ''
+    post = ''
+    first = ''
+    last = ''
 
-    data = ''
-    data = <<-END if header
-#{DATA.gets}#{c} ------------------------------------------------- #{e}
-#{c} #{conf[:sub][:generated_file_string]} #{e}
-#{c} ------------------------------------------------- #{e}
-    END
+    if type == 'bash'
+        first = "#!/bin/bash\n"
+        pre = '#'
+        last = "\n"
+    elsif type == 'ruby'
+        first = "#!/usr/bin/ruby -w\n"
+        pre = '#'
+        last = "\n"
+    elsif type == 'php'
+        first = "<?php\n"
+        pre = '/* '
+        post = ' */'
+        last = '?>'
+    elsif type == 'js' or type == 'css'
+        pre = '/* '
+        post = ' */'
+    elsif type == 'make'
+        first = "# This is a GNU make file which uses GNU make extensions\n"
+        pre = '#'
+        last = "\n"
+    end
+
+    if(header)
+        data =
+            "#{first}" +
+            "#{pre}-------------------------------------------------#{post}\n" +
+            "#{pre}#{conf[:sub][:generated_file_string]}#{post}\n" +
+            "#{pre}-------------------------------------------------#{post}\n" +
+            "#{last}"
+    else
+        data = ''
+    end
+
+
+    first_line = DATA.gets
+    # We skip the first line if it starts with #!/ since we
+    # added that above already.
+    if first_line and not first_line =~ /^#!\//
+        return data if first_line =~ $pb_file_seperator_regrex
+        data += sub_line(conf[:sub], first_line)
+    end
 
     DATA.each_line do |line|
         return data if line =~ $pb_file_seperator_regrex
@@ -614,52 +653,32 @@ def configure (conf)
         end
     end
 
-    public_dirs = print_make_file('.', conf, '.', get_DATA(conf, '#', '', false))
+    # The order of the calls to get_DATA() matters and must
+    # be compatible with the file GNUmakefile that makes phpbootstrap
+
+    public_dirs = print_make_file('.', conf, '.', get_DATA(conf, 'make', false))
     conf[:sub][:public_dirs] = public_dirs
 
     gen_pb_config conf
 
-    gen_pb_build_file('pb_php_compile', get_DATA(conf), conf, true)
+    gen_pb_file('pb_php_compile', get_DATA(conf, 'bash'), conf, true)
 
-    gen_pb_build_file('pb_cat_compile', get_DATA(conf), conf, true)
+    gen_pb_file('pb_cat_compile', get_DATA(conf, 'ruby'), conf, true)
 
-    gen_pb_build_file('pb_auto_prepend.ph', get_DATA(conf, '/*', '*/').strip!, conf)
+    gen_pb_file('pb_auto_prepend.ph', get_DATA(conf, 'php').strip!, conf)
 
-    gen_pb_build_file('pb_auto_append.ph',  get_DATA(conf, '/*', '*/').strip!, conf)
+    gen_pb_file('pb_auto_append.ph', get_DATA(conf, 'php').strip!, conf)
+    
+    gen_pb_file('pb_utils.ph', get_DATA(conf, 'php').strip!, conf)
 
-    gen_pb_build_file('pb_index.cs', get_DATA(conf, '/*', '*/', false), conf)
+    gen_pb_file('pb_fullindex.pphp', get_DATA(conf, 'php').strip!, conf, false, '')
+
+    gen_pb_file('pb_fullindex.cs', get_DATA(conf, 'css').strip, conf)
 
     check_gen_p_install_script('pre_install', conf)
     
     check_gen_p_install_script('post_install', conf)
 
-    if conf[:sub][:debug] and public_dirs.length > 0
-        data = get_DATA(conf, '/*', '*/')
-        public_dirs.each do |dir|
-            if dir != '.'
-                path = dir + '/pb_debug_index.phtml'
-            else
-                path = 'pb_debug_index.phtml'
-            end
-            print_gen path
-            p = File.open(path, 'w')
-            p.write data
-            p.close
-        end
-        if conf[:top_public_dir]
-            dir = conf[:top_public_dir]
-            data = get_DATA(conf, '/*', '*/')
-            if dir != '.'
-                path = dir + '/pb_debug_fullindex.phtml'
-            else
-                path = 'pb_debug_fullindex.phtml'
-            end
-            print_gen path
-            p = File.open(path, 'w')
-            p.write data
-            p.close
-        end
-    end
 end
 
 
@@ -701,15 +720,29 @@ def usage(conf)
   
   Usage: #{File.basename __FILE__} [OPTIONS]
 
-    Creates GNUmakefile make files.  Files are installed with the same directory
-    structure as the source files starting at directories public/ and private/.
-    If the directory public/ does not exist all the files are copied to the
-    public/ install directory, except the files in private/ if it exists in the
-    top source directory.  If there is a directory named public/ in the top
-    source directory all files other than those in private/ that are not in
-    public/ will not be installed.  Files in the build include directory will
-    not be installed.
     This configure script was generated for the package: #{$pb_package_name}.
+
+    Creates GNUmakefile make files.  Files are installed with the same directory
+    structure as the source files in a web accessible directory we refer to as
+    PUBLIC below, with some exceptions.  Files in the top source directory in a
+    directory named private/ will be installed into the directory refered to as
+    PRIVATE below.  Files in the top source directory in a directory named
+    bld_include/ will not be installed.  bld_include/ will contain files that
+    the compiles use to make other files.  So there are four classes of files
+    in the source tree:
+
+       1. (optional) all files in bld_include/,
+
+       2. (optional) all files in private/,
+       
+       3. all other files that have file suffixes that are installed or have
+          make rules that generate files that are installed, and
+       
+       4. all other files.
+
+
+    This will likely conflict with a pre-existing web serivce project.  phpbootstrap
+    is not designed for retrofixed into pre-existing web serivce projects.
 
 
 
@@ -806,22 +839,11 @@ def parse_args
     conf[:top_src_fullpath] = File.dirname $script_path
     conf[:top_build_path] = Dir.pwd
 
-    if File.exist? conf[:public] and File.exist? conf[:private]
-        unless File.directory? conf[:public] and File.directory? conf[:private]
-            $stderr.print "\nfiles " +
-                conf[:public] + " and " +
-                conf[:private] + " exist and are " +
-                "not both directories\n"
+    [ conf[:public], conf[:private]].each do |f|
+        if File.exist?(f) and not File.directory?(f)
+            $stderr.print "\nfile #{f} exists and is not a directory\n\n"
             exit 1
         end
-        conf[:exists] = true
-    elsif (File.exist? conf[:public] or File.exist? conf[:private])
-        $stderr.print "\nfile:\n  " +
-            conf[:public] + "\n or\n  " +
-            conf[:private] + "\nexist, but not both\n"
-        exit 1
-    else
-        conf[:exists] = false
     end
 
     if conf[:top_src_fullpath] == conf[:top_build_path]

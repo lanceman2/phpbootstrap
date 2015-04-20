@@ -1,6 +1,6 @@
 #!/bin/bash
 
-mkdir -p @public@/band
+mkdir -p @public@/bang
 mkdir -p @public@/pop
 mkdir -p @private@/accounts
 

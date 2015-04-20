@@ -1,0 +1,187 @@
+<?php /*server*/
+
+if(@debug@ === false)
+{
+    // TODO: Add authorization method if not debug.
+    header('HTTP/1.0 404 Not Found');
+    exit();
+}
+
+?><!DOCTYPE html>
+<html lang=en>
+<head>
+    <title>@package_name@ files</title>
+    <style>
+<?php pb_insertFile('pb_fullindex.cs'); echo "\n"; ?>
+   </style>
+</head>
+<body class=index>
+
+<?php /*server*/
+
+$types = [
+    'html' => 'html',
+    'php' => 'php',
+    'js' => 'javaScript',
+    'htm' => 'htm',
+    'css' => 'CSS'
+];
+
+?>
+
+    <p>This is a list of all served files and directories in
+    this <b>@package_name@</b> service that exists when this
+    page was served,
+    <?php /*server*/ echo date("Y-m-d H:i:s"); ?>.</p>
+
+    <p>
+    See
+<?php /*server*/
+
+foreach($types as $k => $v)
+    echo "<a href=\"". $_SERVER['SCRIPT_NAME']. "?types=$k\">$v</a>,\n";
+echo " or <a href=\"". $_SERVER['SCRIPT_NAME']. "\">all</a> types.\n";
+
+?>
+    </p>
+
+<div><!-- BEGIN: container of floats -->
+
+<?php /*server*/
+
+
+if(isset($_GET) and isset($_GET['types']))
+{
+    $t = explode(' ', $_GET['types']);
+    //echo "\n<pre>t=".var_export($t, true)."</pre>\n\n";
+    $ts = [];
+    foreach($t as $k)
+        foreach($types as $suffix => $name)
+        {
+            if($k === $suffix)
+            {
+                $ts[$k] = $name;
+                break;
+            }
+        }
+    if(count($ts) > 0)
+        $types = $ts;
+}
+
+
+echo "<p>Now showing types:\n";
+$poo = false;
+foreach($types as $k => $v)
+    echo " <b>$v</b>";
+echo ".</p>\n";
+
+
+/* This file is installed in the top public directory and generates an
+index of all public files (of types listed below) in the whole public
+directory tree. */
+
+// $reldir = '' then 'foo/' then 'foo/bar/'
+// $dirname = '' then 'foo' then 'bar'
+// $rlevel = recurse level
+// $upper_dir_text = accumulated dir <tags> that will only be
+//    printed if there are some regular files found in $dirname
+//    or in subdirectories when recursing.
+function printFiles($name, $suffix, $dirname = '',
+    $reldir = '', $rlevel = 0, $upper_dir_text = '')
+{
+    $si = '    ';
+    $sp =$si;
+    $r = $rlevel;
+    while($r--)
+        $sp .= $si;
+
+    if($rlevel == 0)
+    {
+        $upper_dir_text .= <<<END
+$sp<div class=topdir>
+$sp$si<h4>$name</h4>
+
+END;
+        if(printFiles($name, $suffix, $dirname, '', $rlevel + 1, $upper_dir_text))
+            // We dumped the dir text so now we close the tags
+            echo <<<END
+$sp</div>
+
+END;
+        return;
+    }
+
+
+    // We write all text to a buffer $upper_dir_text until we know there
+    // are some regular files printed.
+
+    $upper_dir_text .= <<<END
+$sp<div class=dirbox>
+$sp$si<div class=dir>$dirname/</div>
+
+END;
+
+    foreach(glob($reldir.'*.'.$suffix) as $f)
+    {
+        $b = basename($f);
+        if($upper_dir_text !== '')
+        {
+            // dump the dir buffer before the regular files
+            echo $upper_dir_text;
+            // mark the buffer as dumped
+            $upper_dir_text = '';
+        }
+
+        echo <<<END
+$sp$si<div class=file><a href="$f">$b</a></div>
+
+END;
+    }
+
+    $bottom = <<<END
+$sp$si<div class=bottom></div>
+
+END;
+
+    if($upper_dir_text !== '')
+        // the dir buffer is not dumped yet so add to it
+        $upper_dir_text .= $bottom;
+    else
+        // the buffer was dumped this call so add to output
+        echo $bottom;
+
+
+    foreach(glob($reldir.'*/') as $d)
+        // recurse to another dir
+        if(printFiles($name, $suffix, basename($d),
+            $d, $rlevel + 1, $upper_dir_text))
+            // mark the dir <tags> as dumped
+            $upper_dir_text = '';
+
+    if($upper_dir_text === '')
+    {
+        // We dumped the dir text so now we close the tags
+        echo <<<END
+$sp</div>
+
+END;
+        return true;
+    }
+    // else
+    // the stack unwinded without dumping the dir text than
+    // there were no regular files present to show and the
+    // dir text <tags> will not be printed (dumped).
+
+    return false;
+}
+
+
+foreach($types as $key => $value)
+    printFiles($value, $key);
+
+?>
+
+</div><!-- END: container of floats -->
+
+</body>
+</html>

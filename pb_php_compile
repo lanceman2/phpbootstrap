@@ -1,6 +1,12 @@
 #!/bin/bash
 
-# Usage: pb_php_compile in out [url_path_dir]
+# Usage: pb_php_compile in out [url_public_dir]
+
+# url_public_dir is the path from public install dir
+# with a leading '/' like /foo or / or /foo/bar
+
+# url_public_dir may not be the same as URL path
+# because that depends on how the server is configured.
 
 scriptdir="$(dirname ${BASH_SOURCE[0]})" || exit 1
 
@@ -16,7 +22,6 @@ if ! @srcdir_equals_builddir@ ; then
 fi
 
 include_path="$include_path:$scriptdir"
-
 
 header=''
 tmpout="${2}.tmp"
@@ -73,9 +78,9 @@ export PHP_INFILENAME="$in"
 export LANG="en_US.UTF-8"
 
 if [ -n "$3" ] ; then
-    export PHP_URLPATHDIR="$3"
+    export PHP_PUBLICDIR="$3"
 else
-    export PHP_URLPATHDIR="none"
+    export PHP_PUBLICDIR="/"
 fi
 
 

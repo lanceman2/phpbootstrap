@@ -10,14 +10,20 @@ simple way.
 This has a little reflective meta-programming
 (http://en.wikipedia.org/wiki/Metaprogramming) in the simplest sense.  PHP
 being used to write server side PHP, in addition to html and other file
-types.  We use PHP, ruby, and cat to compile served web content files.  We
-don't need to think about much, because it's just a naturally occurring
-optimization.  We looked at ruby rails, but it seems to fall too far from
-the UNIX development paradigm for us.  PHP is slow and a mess of a
-language, but we may not live long enough to write this HTTP web service
-code in C or C++.  PHP has got all the tools ready to go, and it's
-popularity helps make it very reliable.
+types.  We use PHP, ruby, and cat to compile served web content files.
+We don't need to think about much, because it's just a naturally occurring
+optimization for any system level software developer.  We looked at ruby
+rails, but it seems to fall too far from the UNIX development paradigm for
+us.  PHP is slow and a mess of a language, but we may not live long enough
+to write this HTTP web service code in C or C++.  PHP has got all the
+tools ready to go, and it's popularity helps make it very reliable.
 
+
+## Ports
+
+GNU/Linux.  We are currently developing phpbootstrap on debian GNU/Linux.
+We are not interested in MS windows, hence we have `/` hard coded in local
+paths.
 
 
 ## Brief Description
@@ -53,15 +59,21 @@ software to interactively install software is not friendly.  Think about
 it, it takes away user freedom.  Software packages should be able to be
 non-interactively built and installed.  A web service is a software package.
 
-This not so new web service development paradigm does not have to conflict
-with say for example the way WordPress is installed.  With a build system
-web services could than be more easily be installed on a source based
-system like gentoo.  It would make OpenStack so easy to do, that it would
-be pointless.  It's fucking obvious.  Having to edit shit.conf.php and
-than interact with a browser to install software is total bullshit.
-Granted you can write script workarounds that make a would-be interactive
-install process be non-interactive, but we don't see these scripts being
-distributed with the software. Enough said.
+With a build system, like phpbootstrap, web services may be more easily
+installed on a source based system like gentoo.   i.e. you could make an
+ebuild from the source of the package.  It would make OpenStack so easy to
+do, that it would be pointless.  It's fucking obvious.  Having to edit
+shit.conf.php and than interact with a browser to install software is
+total bullshit.  It's a software development mindset that somehow never
+got into the heads of web service software developers.  Granted you can
+write script workarounds that make a would-be interactive install process
+be non-interactive; we don't see these scripts being distributed with the
+software.  phpbootstrap may be very difficult to retrofit into an
+existing web service.  Retrofitting is just not in the current development
+scope of phpbootstrap.  phpbootstrap is using very simple and restrictive
+file name rules, in order to keep things as simple as possible, where-by
+making the build system configuration flexibility a secondary concern.
+phpbootstrap is a very simple build system for web service software.
 
 phpbootstrap is a ruby script, that installs in a single self contained
 file, which may remind you of WAF, The meta build system.  phpbootstrap is
@@ -115,7 +127,7 @@ some point you have to ask yourself, why not make the data base server be
 the web server.  Compared to serving static files where we just have the
 file system open/read/write/close.  Don't forget, now-a-days, the OS has
 read file caching built in.  Having a data base add caching on top of the
-OS file caching is a waste of memory, but maybe the high end data base
+OS file caching may be a waste of memory, but maybe the high end data base
 servers take that into account.  Ya, maybe there is persistent data base
 server connections, but that does not address all the costs of using a
 data base server.
