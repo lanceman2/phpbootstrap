@@ -1,10 +1,12 @@
-<?php /*server*/
+<?php
 
 if(@debug@ === false)
 {
+?><?php/*server*/
     // TODO: Add authorization method if not debug.
     header('HTTP/1.0 404 Not Found');
     exit();
+?><?php
 }
 
 ?><!DOCTYPE html>
@@ -12,7 +14,7 @@ if(@debug@ === false)
 <head>
     <title>@package_name@ files</title>
     <style>
-<?php pb_insertFile('pb_fullindex.cs'); echo "\n"; ?>
+<?php pb_insertFile('pb_index.cs'); echo "\n"; ?>
    </style>
 </head>
 <body class=index>
@@ -29,13 +31,8 @@ $types = [
 
 ?>
 
-    <p>This is a list of all served files and directories in
-    this <b>@package_name@</b> service that exists when this
-    page was served,
-    <?php /*server*/ echo date("Y-m-d H:i:s"); ?>.</p>
-
-    <p>
-    See
+     <p>
+    See just
 <?php /*server*/
 
 foreach($types as $k => $v)
@@ -45,7 +42,6 @@ echo " or <a href=\"". $_SERVER['SCRIPT_NAME']. "\">all</a> types.\n";
 ?>
     </p>
 
-<div><!-- BEGIN: container of floats -->
 
 <?php /*server*/
 
@@ -68,8 +64,42 @@ if(isset($_GET) and isset($_GET['types']))
         $types = $ts;
 }
 
+$dir = '';
 
-echo "<p>Now showing types:\n";
+if(isset($_GET) and isset($_GET['dir']))
+{
+    $d = $_GET['dir'];
+    if(substr($d, 0, 1) === '/')
+        $d = substr($d, 1);
+
+    $d0 = substr($d, 0, 1);
+    if(is_dir($d) and $d0 !== '/' and $d0 !== '.')
+        // This dir is a directory in PWD
+        $dir = $d;
+}
+
+$dirname = '';
+$reldir = '';
+$relurl = basename(__FILE__);
+
+if($dir !== '')
+{
+    if(substr($dir, -1, 1) !== '/')
+        $reldir = $dir.'/';
+    else
+        $reldir = $dir;
+    $dirname = basename($dir);
+}
+
+$index_url = $_SERVER['HTTP_HOST'] . '/'. $reldir;
+
+echo <<<END
+  <h3>@package_name@ served file index at $index_url</h3>
+
+END;
+
+
+echo "<p>Now showing all files of type:\n";
 $poo = false;
 foreach($types as $k => $v)
     echo " <b>$v</b>";
@@ -80,7 +110,7 @@ echo ".</p>\n";
 index of all public files (of types listed below) in the whole public
 directory tree. */
 
-// $reldir = '' then 'foo/' then 'foo/bar/'
+// $reldir = '' then 'foo/' then 'foo/bar/' from install public root /
 // $dirname = '' then 'foo' then 'bar'
 // $rlevel = recurse level
 // $upper_dir_text = accumulated dir <tags> that will only be
@@ -89,9 +119,18 @@ directory tree. */
 function printFiles($name, $suffix, $dirname = '',
     $reldir = '', $rlevel = 0, $upper_dir_text = '')
 {
+    global $relurl;
+
     $si = '    ';
     $sp =$si;
     $r = $rlevel;
+
+    if($rlevel >= 400)
+    {
+        trigger_error('recursed 400 times', E_USER_ERROR);
+        exit(1);
+    }
+
     while($r--)
         $sp .= $si;
 
@@ -102,7 +141,7 @@ $sp<div class=topdir>
 $sp$si<h4>$name</h4>
 
 END;
-        if(printFiles($name, $suffix, $dirname, '', $rlevel + 1, $upper_dir_text))
+        if(printFiles($name, $suffix, $dirname, $reldir, $rlevel + 1, $upper_dir_text))
             // We dumped the dir text so now we close the tags
             echo <<<END
 $sp</div>
@@ -115,9 +154,14 @@ END;
     // We write all text to a buffer $upper_dir_text until we know there
     // are some regular files printed.
 
+    if($reldir === '')
+        $href = $relurl;
+    else
+        $href = "$relurl?dir=$reldir";
+
     $upper_dir_text .= <<<END
 $sp<div class=dirbox>
-$sp$si<div class=dir>$dirname/</div>
+$sp$si<div class=dir><a href="$href">$dirname/</a></div>
 
 END;
 
@@ -175,10 +219,17 @@ END;
     return false;
 }
 
+echo <<<END
+<div><!-- BEGIN: container of floats -->
+
+END;
 
 foreach($types as $key => $value)
-    printFiles($value, $key);
+    printFiles($value, $key, $dirname, $reldir);
 
+
+//printFiles('html', 'html', $dirname, $reldir);
+//printFiles('html', 'html', '1', 'pop/1/');
 ?>
 
 </div><!-- END: container of floats -->

@@ -91,7 +91,8 @@ if File.basename($script_path) == 'phpbootstrap'
         puts <<-END
   Usage: phpbootstrap [-h|--help]|[-V|--version]
 
-  Generate a phpbootstrap configure and other scripts.
+  Generate a phpbootstrap configure and other scripts.  Reads ruby file pb.config
+  and calls config() in that file, if the file is found in the current directory.
 
   
       OPTIONS
@@ -100,47 +101,46 @@ if File.basename($script_path) == 'phpbootstrap'
 
    -V|--version         print the phpbootstrap version (#{$pb_version}) and exit
 
-   --name PACKAGE_NAME  set the package name to PACKAGE_NAME, the default is the
-                        current directory file name
   
 
         END
         exit
     end
 
-    def check_install_script(name, val)
-
-        if val[0] == '/'
-            puts "#{name} cannot be a full path"
-            return false
-        end
-
-        if File.exist?val
-            return true # success
-        else
-            puts "  file #{val} was not found"
-            return false
-        end
-    end
 
     arg = ARGV.shift
     package_name = File.basename Dir.pwd
-
-    ret = false
 
     while arg
         if arg =~ /(--version|-V)/
             puts $pb_version
             exit
-        elsif ret = check_arg('--name', arg)
-            package_name = ret
         else
             bs_usage
         end
         arg = ARGV.shift
     end
 
+    opts = {}
+
+    if File.exist? 'pb.config'
+        $stderr.print "Found file: pb.config\n"
+        load 'pb.config'
+        conf = {}
+        config(conf, opts)
+        # puts conf.to_s
+        if conf[:package_name] and conf[:package_name].is_a? String
+            package_name = conf[:package_name]
+        end
+    end
+    
     package_name.gsub!(/[^a-zA-Z0-9_]/, '')
+    
+    if opts.length
+        opts = '$pb_options = ' + opts.to_s
+    else
+        opts = ''
+    end
 
     ##############################################################
     # This script copies itself to configure with some additions #
@@ -157,7 +157,7 @@ if File.basename($script_path) == 'phpbootstrap'
 #####################################################
 # pb_package_name was defined when phpbootstrap ran
 $pb_package_name = '#{package_name}'
-
+#{opts}
     END
     while line = rd.gets
         # skip up to pb_file_seperator_regrex
@@ -408,7 +408,7 @@ def print_make_file(buildpath, conf, top_builddir, data)
             'pb_utils.ph',
             'pb_php_compile', 'pb_cat_compile',
             'pb_config',
-            'pb_fullindex.cs'
+            'pb_index.cs'
         ].each do |pb|
             add_distclean += "\\\n " + conf[:sub][:pb_build_prefix] + pb
         end
@@ -429,7 +429,7 @@ def print_make_file(buildpath, conf, top_builddir, data)
     end
 
     if installdir and buildpath == '.'
-        add_distclean += "\\\n pb_fullindex.pphp"
+        add_distclean += "\\\n pb_index.pphp"
     end
 
     if add_distclean.length > 0
@@ -671,9 +671,9 @@ def configure (conf)
     
     gen_pb_file('pb_utils.ph', get_DATA(conf, 'php').strip!, conf)
 
-    gen_pb_file('pb_fullindex.pphp', get_DATA(conf, 'php').strip!, conf, false, '')
+    gen_pb_file('pb_index.pphp', get_DATA(conf, 'php').strip!, conf, false, '')
 
-    gen_pb_file('pb_fullindex.cs', get_DATA(conf, 'css').strip, conf)
+    gen_pb_file('pb_index.cs', get_DATA(conf, 'css').strip, conf)
 
     check_gen_p_install_script('pre_install', conf)
     
@@ -685,7 +685,7 @@ end
 # TODO: use this or remove it.
 def help_printOpt(f, pre, text)
 
-    max = 76 # length of printed text line
+    max = 82 # length of printed text line
     spaces = "                         " # indent
     indent = spaces.length
     charPerLine = max - indent
@@ -753,7 +753,8 @@ def usage(conf)
   --debug true|false  make it a debug build, i.e. not production, or not
 
   --prefix PREFIX     full path to where to install PUBLIC and PRIVATE docs.
-                      The current default is #{conf[:default_prefix]}.
+                      The current default is:
+                        #{conf[:default_prefix]}
                       Setting this will set PRIVATE and PUBLIC to PREFIX/private
                       and PREFIX/public respectively.
 
@@ -763,13 +764,25 @@ def usage(conf)
   --public PUBLIC     full path prefix to installed files that are web accessible.
                       The default is PREFIX/public.  Setting this will override PREFIX.
 
-  --web-user USER     web server user that owns files that are written by the server.
-                      By default the user that runs this configure script is the web USER.
-
   --version|-V        print the phpbootstrap version number (#{$pb_version}) and exit.
 
 
 END
+
+    if $pb_options
+
+        $stdout.print <<-END
+                #{$pb_package_name} OPTIONS
+
+
+        END
+
+        $pb_options.each do |name,val|
+            help_printOpt($stdout, '--' + name.to_s + ' VALUE',
+                         val[:description] +
+                         ".  The default VALUE is " + val[:value])
+        end
+    end
     exit 1
 end
 
@@ -787,6 +800,15 @@ def which(path)
     path
 end
 
+def check_package_option(arg, conf)
+
+    $pb_options.each do |name,val|
+        if ret = check_arg('--' + name.to_s, arg, conf)
+            return [name, ret]
+        end
+    end
+    false
+end
 
 def parse_args
 
@@ -805,8 +827,10 @@ def parse_args
     conf[:private] = Dir.pwd + '/pb_service/private'
 
     conf[:sub][:install_user] = Etc.getpwuid(Process.uid).name
-    conf[:sub][:web_user] = conf[:sub][:install_user]
 
+    $pb_options.each do |name,val|
+         conf[:sub][name] = val[:value]
+    end
 
 
     while arg
@@ -817,8 +841,6 @@ def parse_args
             conf[:public] = File.expand_path ret
         elsif ret = check_arg('--private', arg, conf)
             conf[:private] = File.expand_path ret
-        elsif ret = check_arg('--web-user', arg, conf)
-            conf[:web_user] = File.expand_path ret
         elsif ret = check_arg('--prefix', arg, conf)
             ret = File.expand_path ret
             conf[:public] = ret + '/public'
@@ -830,6 +852,8 @@ def parse_args
             else
                 conf[:sub][:debug] = 'true' if ret =~ /(^y|^t|^[1-9]|^on|^al)/
             end
+        elsif ret = check_package_option(arg, conf)
+            conf[:sub][ret[0]] = ret[1]
         else
             usage conf
         end
@@ -862,8 +886,7 @@ def parse_args
     conf[:sub][:css_compile] = conf[:sub][:yui_path] +\
         ' --type css --line-break 50' unless conf[:sub][:css_compile]
 
-    conf[:sub][:generated_file_string] = $generated_file_magic_string +
-        ' debug=' + conf[:sub][:debug].to_s
+    conf[:sub][:generated_file_string] = $generated_file_magic_string
     conf[:sub][:package_name] = $pb_package_name
     # pb_build_prefix must be relative a path
     conf[:sub][:pb_build_prefix] = 'pb_build/'

@@ -23,8 +23,18 @@ This is the @package_name@ package
 
 <?php /*server*/
 
+  $time = date('@time_format@');
   echo <<<END
-   <p>This is from serve time php</p>
+       <p>The serve time is $time using time format
+       </p>
+       <pre>@time_format@</pre>
+
+END;
+    ?><?php
+
+    $time = date('@time_format@');
+    echo <<<END
+       <p>Calling date when this was compiled gives time $time.</p>
 
 END
 

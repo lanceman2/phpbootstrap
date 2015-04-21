@@ -22,7 +22,7 @@ built_php_php = $(sort \
  $(patsubst $(srcdir)/%.pphp, %.php, $(wildcard $(srcdir)/*.pphp))\
  $(patsubst $(srcdir)/%.pphp.in, %.php, $(wildcard $(srcdir)/*.pphp.in)))
 ifeq ($(top_builddir),.)
-  built_php_php := $(sort $(built_php_php) pb_fullindex.php)
+  built_php_php := $(sort $(built_php_php) pb_index.php)
 endif
 built_php_js = $(sort \
  $(patsubst $(srcdir)/%.pjs, %.js, $(wildcard $(srcdir)/*.pjs))\
@@ -116,12 +116,12 @@ ifndef srcdir_equals_builddir
 endif
 
 
-built_gzip_gz := $(addsuffix .gz,\
+built_gzip_gz := $(sort $(addsuffix .gz,\
  $(filter-out %.cs %.jsp %.php,\
  $(built_php)\
  $(built_cat)\
  $(built_md_html)\
- $(installed_fromsrc)))
+ $(installed_fromsrc))))
 
 built := $(strip\
  $(built_in_any)\
@@ -131,17 +131,31 @@ built := $(strip\
  $(built_gzip_gz))
 
 ifdef installdir
-installed := $(strip $(filter-out %.cs %.jsp %.ph %.phd, $(built)) $(installed_fromsrc))
+installed := $(strip $(filter-out\
+ %.cs\
+ %.jsp\
+ %.ph\
+ %.phd\
+ %.pphp\
+ %.pcss\
+ %.pjs\
+ %.phtm\
+ %.phtml\
+ %.ccs\
+ %.cjs\
+ %.cphp\
+ %.chtm\
+ %.chtml, $(built)) $(installed_fromsrc))
 
 # Check for duplicate installed files.
-# This is why we did not sort $(built) and $(installed).
+# This is why we did not sort all of $(built) and $(installed).
 dups :=
 define CHECK_dups =
-  ifneq ($$(findstring $(1),$$(dups)),)
+  ifneq ($$(findstring /$(1)/,$$(dups)),)
       $$(error Found duplicate installed file $(1)\
- in installed files = "$$(installed)")
+ in installed files = "$$(installed)" installed_fromsrc="$(installed_fromsrc)")
   endif
-  dups := $$(dups) $(1)
+  dups := $$(dups) /$(1)/
 endef
 $(foreach f,$(installed),$(eval $(call CHECK_dups,$(f))))
 undefine dups

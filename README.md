@@ -7,17 +7,6 @@ possible.  Why have PHP generate the same page every time?  Why not run
 PHP at serve time, only when you need to.  It's PHP caching in a very
 simple way.
 
-This has a little reflective meta-programming
-(http://en.wikipedia.org/wiki/Metaprogramming) in the simplest sense.  PHP
-being used to write server side PHP, in addition to html and other file
-types.  We use PHP, ruby, and cat to compile served web content files.
-We don't need to think about much, because it's just a naturally occurring
-optimization for any system level software developer.  We looked at ruby
-rails, but it seems to fall too far from the UNIX development paradigm for
-us.  PHP is slow and a mess of a language, but we may not live long enough
-to write this HTTP web service code in C or C++.  PHP has got all the
-tools ready to go, and it's popularity helps make it very reliable.
-
 
 ## Ports
 

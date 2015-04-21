@@ -16,8 +16,8 @@ data_files =\
  pb_auto_prepend.ph\
  pb_auto_append.ph\
  pb_utils.ph\
- pb_fullindex.pphp\
- pb_fullindex.cs
+ pb_index.pphp\
+ pb_index.cs
 
 seperator = "\#\# End: phpbootstrap ruby DATA build file:"
 

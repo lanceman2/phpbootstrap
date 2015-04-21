@@ -1,61 +1,75 @@
 body.index {
     background-color: #AED0D7;
 }
-h4.index {
-    margin: 10px;
-    text-align: center;
-    margin-bottom: 4px;
-    padding-bottom: 3px;
-    padding-left: 5px;
-    padding-right: 5px;
-    border: 4px solid;
-    border-radius: 16px;
-    border-color: #26AEC7;
+h4, div.dir {
     background-color: #26AEC7;
 }
-ul.index {
-    margin-left: 10px;
-    margin-right: 5px;
-    padding: 5px;
+div.topdir, div.dirbox {
+    border-color: #26AEC7;
 }
-div.li {
-    margin: 3px;
-    margin-left: 20px;
+h4, div.dirbox {
+    margin-left: 6px;
+    margin-right: 6px;
 }
-div.dir_box {
-    margin: 0px;
+h4 {
+    margin-top: 6px;
+    margin-bottom: 4px;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 6px;
+    padding-bottom: 5px;
+    text-align: center;
+    border-width: 0px;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+div.dirbox {
     padding: 0px;
-    margin-left: 20px;
-    border: 1px solid;
-    border-radius: 2px;
-    border-color: #268E97;
-    /* background-color: #26AEC7; */
+    margin-bottom: 0px;
+    margin-top: 0px;
+    border-style: solid;
+    border-width: 2px;
+    border-radius: 4px;
 }
-div.bottom_pad {
+div.bottom {
     margin: 6px;
     padding: 0px;
 }
-div.li_dir {
-    margin: 0px;
-    margin-top: 0px;
-    padding-left: 8px;
-    padding-right: 8px;
-    padding-bottom: 3px;
-    width: auto;
-    border: 1px solid;
-    border-radius: 2px;
-    border-color: #268E97;
-    background-color: #26AEC7;
-}
-div.ul {
-    margin: 10px;
-}
-div.index {
-    border: 4px solid;
-    border-radius: 10px;
-    border-color: #26AEC7;
-    width: auto;
+div.topdir {
+    border-style: solid;
+    border-width: 4px;
+    border-top-left-radius: 22px;
+    border-top-right-radius: 22px;
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
     float: left;
-    margin: 5px;
+    width: auto;
+    margin: 4px;
     padding:3px;
+}
+div.file, div.dir {
+    margin: 5px;
+}
+div.file {
+    padding-left: 6px;
+}
+div.dir {
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    border-style: solid;
+    border-width: 0px;
+    border-radius: 2px;
+}
+a:link, a:visited, a:hover, a:active {
+    text-decoration: none;
+}
+a:hover {
+    background-color: #D0D9DB;
+}
+a:active {
+    background-color: #99ADB2;
 }
