@@ -97,30 +97,6 @@ files, with auto-generated depend files.
 
 ## What About a Data Base Server
 
-This web software build system is intended to make static files that are
-served using the web servers operating system (OS) file system.  Like it
-or not, the OS file system is a data base, and becoming more so as OS's
-evolve.  Using a data base server on top of the OS's file system is
-avoided.  Using the bare bones operating system file system is much faster
-and simpler.  Using a data base server adds a shit load of system calls to
-every HTTP server request, and system calls are the top computer resource
-pig in any code.  It may be the case that the cost of using a data base
-server is balanced against the utility of inter-relational data access.
-We the developers of phpbootstrap are developing a service that we hope
-does not need much along the lines of dynamic inter-relationships between
-served files in HTTP requests.  It does not matter how well designed a
-data base server is, when using a data base server you will be adding:
-server connection, context switching, additional locking, socket reads and
-writes, all in addition to file system open/read/write/close costs.  At
-some point you have to ask yourself, why not make the data base server be
-the web server.  Compared to serving static files where we just have the
-file system open/read/write/close.  Don't forget, now-a-days, the OS has
-read file caching built in.  Having a data base add caching on top of the
-OS file caching may be a waste of memory, but maybe the high end data base
-servers take that into account.  Ya, maybe there is persistent data base
-server connections, but that does not address all the costs of using a
-data base server.
-
 If you build your service on a data base server, phpbootstrap way not be
 what you want.  Who are we kidding, phpbootstrap will never be used by
 anyone but phpbootstrap developers.
