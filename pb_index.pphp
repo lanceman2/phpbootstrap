@@ -32,12 +32,13 @@ $types = [
 ?>
 
      <p>
-    See just
+    See all files of type
 <?php /*server*/
 
 foreach($types as $k => $v)
-    echo "<a href=\"". $_SERVER['SCRIPT_NAME']. "?types=$k\">$v</a>,\n";
-echo " or <a href=\"". $_SERVER['SCRIPT_NAME']. "\">all</a> types.\n";
+    echo "[<a href=\"". $_SERVER['SCRIPT_NAME']. "?types=$k\">$v</a>],\n";
+echo "[<a href=\"". $_SERVER['SCRIPT_NAME']. "\">all files of all types</a>], or\n";
+echo "[<a href=\"". $_SERVER['SCRIPT_NAME']. "?types=html+php\">all html and php files</a>].\n";
 
 ?>
     </p>
@@ -99,7 +100,7 @@ echo <<<END
 END;
 
 
-echo "<p>Now showing all files of type:\n";
+echo "<p>Now showing files of type:\n";
 $poo = false;
 foreach($types as $k => $v)
     echo " <b>$v</b>";

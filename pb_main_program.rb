@@ -340,6 +340,60 @@ def gen_pb_file(name, data, conf, is_exe = false,
 end
 
 
+def get_subdirs_from_make(buildpath, bp_make_path)
+
+    # Get subdirs from bp.make if we can
+
+    gpath = buildpath + '/GNUmakefile.tmp_zZ'
+    f = File.open(gpath, "w")
+    f.write <<-END
+# Temporary GNU makefile used to get value of SUBDIRS
+include #{bp_make_path}
+undefine build
+ifeq ($(strip $(SUBDIRS)),)
+SUBDIRS :=
+endif
+test__subdirs_FASDiefjmzzz:
+    END
+    f.write "\t@echo \"@@@@$(strip $(SUBDIRS))####\"\n"
+    f.close
+    run = "make -C #{buildpath} --silent -f GNUmakefile.tmp_zZ " +
+        "test__subdirs_FASDiefjmzzz"
+    # We found that there can be extra spew in the output of GNU make
+    # even with --silent, if this is run from another make process,
+    # so we look for a string between @@@@ and ####.
+    out = %x[#{run}]
+    subdirs = ''
+    out.each_line do |s|
+        if s =~ /@@@@.*####/
+            subdirs = s.gsub(/(^.*@@@@|####.*$)/,'')
+            break
+        end
+    end
+        
+    # error/bug check
+    if subdirs =~ /Entering directory/
+        # WTF: Is echo in the make file not run in an atomic way?
+        $stderr.print "running: #{run}\nspewed badly the following\n"
+        $stderr.print out + "\n"
+        exit 1
+    elsif not $?.success?
+        # make failed
+        $stderr.print <<-END
+  configure failed: running:
+    #{run}
+  FAILED
+        END
+        exit 1
+    end
+    File.unlink gpath
+    #$stderr.print 'subdirs ="' + subdirs.to_s + "\"\n"
+
+    # make an array of sub-directories from space separated list
+    subdirs.split
+end
+
+
 # buildpath is the dir where to write GNUmakefile, like . or 'foo' or
 # 'foo/bar' which is a relative path from the top of the source directory
 # tree which is the same in the build directory tree.
@@ -502,44 +556,9 @@ $(post_install):  #{top_srcdir}/post_install
     f.write data
     f.close
 
-    subdirs = []
+    return dirs unless File.exist? bp_make_path
 
-    # Get subdirs from bp.make if we can
-    if File.exist? bp_make_path
-        gpath = buildpath + '/GNUmakefile.tmp_zZ'
-        f = File.open(gpath, "w")
-        f.write <<-END
-# Temporary GNU makefile used to get value of SUBDIRS
-include #{bp_make_path}
-undefine build
-ifeq ($(strip $(SUBDIRS)),)
-SUBDIRS :=
-endif
-test__subdirs_FASDiefjmzzz:
-        END
-        f.write "\t@echo \"$(strip $(SUBDIRS))\"\n"
-        f.close
-        run = "make -C #{buildpath} --silent -f GNUmakefile.tmp_zZ " +
-            "test__subdirs_FASDiefjmzzz"
-        subdirs = %x[#{run}].split
-        # bug check
-        if subdirs =~ /Entering directory/
-            $stderr.print "running makitems.html.gze spewed badly again\n"
-            exit 1
-        elsif not $?.success?
-            $stderr.print <<-END
-  configure failed: running:
-    #{run}
-  FAILED
-            END
-            exit 1
-        end
-
-        File.unlink gpath
-        ##$stderr.print 'subdirs ="' + subdirs.to_s + "\"\n"
-    end
-
-    return dirs unless subdirs.length > 0
+    subdirs = get_subdirs_from_make(buildpath, bp_make_path)
 
     # go to the next directory
     if top_builddir == '.'

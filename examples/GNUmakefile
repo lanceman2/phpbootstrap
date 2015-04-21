@@ -9,6 +9,10 @@ made_dirs = $(patsubst %/GNUmakefile,%,$(wildcard $(addsuffix /GNUmakefile,$(sub
 configure_files = $(sort $(wildcard */configure))
 installed_services = $(sort $(wildcard */pb_service))
 
+
+
+
+
 build: clean
 	$(MAKE) -C ..
 	@for d in $(subdirs) ; do\
@@ -23,7 +27,7 @@ build: clean
 	    echo ;\
 	    mkdir -p $${d}_BUILD ;\
 	    cd $${d}_BUILD || exit 1 ;\
-	    ../$$d/configure || exit 1 ;\
+	    ../$$d/configure $(CONFIGURE_OPTS) || exit 1 ;\
 	    $(MAKE) || exit 1 ;\
 	    $(MAKE) install || exit 1 ;\
 	    if [ -f install_test ] ; then ./install_test || exit 1 ; fi ;\
@@ -32,7 +36,7 @@ build: clean
 	    echo "=========== building package $$d in the source ============" ;\
 	    echo ;\
 	    cd $$d || exit 1 ;\
-	    ./configure || exit 1 ;\
+	    ./configure $(CONFIGURE_OPTS) || exit 1 ;\
 	    $(MAKE) || exit 1 ;\
 	    $(MAKE) install || exit 1 ;\
             if [ -f install_test ] ; then ./install_test || exit 1 ; fi ;\
@@ -42,6 +46,12 @@ build: clean
 	@echo
 	@echo "Built all example packages SUCCESSFULLY in both src and separate build dir"
 	@echo "or so it appears"
+
+nodebug:
+	$(MAKE) build CONFIGURE_OPTS=--debug=false
+debug:
+	$(MAKE) build CONFIGURE_OPTS=--debug=true
+
 
 # There is nothing to distinguish between clean and distclean files.
 clean distclean:

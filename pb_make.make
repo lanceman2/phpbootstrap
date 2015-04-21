@@ -95,10 +95,11 @@ installed_fromsrc :=
 ifneq ($(fromsrc),)
   # String '@generated_file_string@' matches string
   # put in files from pb_php_compile and pb_cat_compile
+  # installed_fromsrc must have a valid path from ./
   define GET_fromsrc =
     installed_fromsrc := $$(installed_fromsrc) $$(shell\
       if ! head -5 $(1) | grep -q '@generated_file_string@' ;\
-        then echo "$$(notdir $(1))"; fi)
+        then echo "$(1)"; fi)
   endef
 $(foreach f,$(fromsrc),$(eval $(call GET_fromsrc,$(f))))
 undefine GET_fromsrc
@@ -121,7 +122,7 @@ built_gzip_gz := $(sort $(addsuffix .gz,\
  $(built_php)\
  $(built_cat)\
  $(built_md_html)\
- $(installed_fromsrc))))
+ $(patsubst $(srcdir)/%,%, $(installed_fromsrc)))))
 
 built := $(strip\
  $(built_in_any)\
@@ -157,7 +158,7 @@ define CHECK_dups =
   endif
   dups := $$(dups) /$(1)/
 endef
-$(foreach f,$(installed),$(eval $(call CHECK_dups,$(f))))
+$(foreach f,$(patsubst $(srcdir)/%,%,$(installed)),$(eval $(call CHECK_dups,$(f))))
 undefine dups
 undefine CHECK_dups
 endif # ifdef installdir
@@ -273,7 +274,7 @@ include $(wildcard *.d)
 %.cs: %.ccs
 	$(cat_compile) $< $@
 %.gz: %
-	gzip -kf $<
+	gzip -kfc --rsyncable $< > $@
 
 
 clean: clean_norec $(clean_rec)
