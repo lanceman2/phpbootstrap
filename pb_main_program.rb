@@ -107,6 +107,28 @@ if File.basename($script_path) == 'phpbootstrap'
         exit
     end
 
+    def get_hash_as_string(h)
+
+        # just printing h.to_s makes a very long line
+        # so we add some newlines 
+        ret = '{'
+        got = false
+        h.each do |k,v|
+            ret += "," if got
+            ret += "\n  :#{k.to_s}=>"
+            if (v.is_a? Array) or (v.is_a? Hash) or (v.is_a? TrueClass) or (v.is_a? FalseClass)
+                ret += "#{v.to_s}"
+            elsif v.is_a? String
+                ret += "\"#{v.to_s}\""
+            else
+                $stderr.print "unknown stuff in pb.config\n"
+                exit 1
+            end
+            got = true
+        end
+        ret += "\n}"
+    end
+
 
     arg = ARGV.shift
     package_name = File.basename Dir.pwd
@@ -133,17 +155,17 @@ if File.basename($script_path) == 'phpbootstrap'
             package_name = conf.delete(:package_name)
         end
     end
-    
+
     package_name.gsub!(/[^a-zA-Z0-9_]/, '')
 
     if conf.length
-        conf = '$pb_conf = ' + conf.to_s
+        conf = '$pb_conf = ' + get_hash_as_string(conf) + "\n"
     else
         conf = ''
     end
-    
+
     if opts.length
-        opts = '$pb_options = ' + opts.to_s
+        opts = '$pb_options = ' + get_hash_as_string(opts) + "\n"
     else
         opts = ''
     end
