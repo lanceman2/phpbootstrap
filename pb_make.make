@@ -118,10 +118,11 @@ endif
 
 
 built_gzip_gz := $(sort $(addsuffix .gz,\
- $(filter-out %.cs %.jsp %.php,\
+ $(filter %.html %.htm %.md %.js %.css %.txt,\
  $(built_php)\
  $(built_cat)\
  $(built_md_html)\
+ $(built_in_any)\
  $(patsubst $(srcdir)/%,%, $(installed_fromsrc)))))
 
 built := $(strip\
@@ -211,11 +212,6 @@ endif
 .SUFFIXES: .md .html .htm .html .ht .php .ph .phd .css .js .gz\
  .pphp .phtml .phtm .pjs .pcss .cphp .chtml .chtm .cjs .ccss .txt\
  .jsp .cs .ht .ph .phd .cjsp .ccs
-
-
-.INTERMEDIATE:
-
-.SECONDARY:
 
 
 define MAKE_in_rules =
@@ -321,11 +317,13 @@ _debug_do:
 	@echo "installed = $(installed)"
 	@echo "install_rec=$(install_rec)"
 	@echo "build_rec=$(build_rec)"
+	@echo "built_gzip_gz=$(built_gzip_gz)"
 	@echo "built_in_any=$(built_in_any)"
 	@echo "srcdir=$(srcdir)"
 	@echo "VPATH=$(VPATH)"
 
-
+# We must filter-out files that are gziped so that that
+# we rebuild them when we build the un-gziped version of it.
 build_norec build_do: $(built)
 install_norec install_do: $(installed)
 

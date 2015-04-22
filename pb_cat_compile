@@ -114,7 +114,6 @@ $out.write $outpath + ':'
 $files.each do |f|
     $out.write "\\\n " + f
 end
-
 $out.write "\n"
 $out.close
 $gen_magic_str = '@generated_file_string@'
