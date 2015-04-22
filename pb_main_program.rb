@@ -299,7 +299,7 @@ end
   if outpath and not ARGV[2]
     l = fin.gets
     suffix = outpath.gsub(/^.*\\./, '')
-    if suffix =~ /^(ht|htm|html)$/ and l =~ /^<!DOCTYPE /
+    if suffix =~ /^(ht|htm|html|md)$/ and l =~ /^<!DOCTYPE /
       write_line(pkg, l, out)
       out.write "<!-- \#{pkg[:generated_file_string]} -->\\n"
     elsif suffix =~ /^(ht|htm|html)$/
@@ -487,9 +487,12 @@ def print_make_file(buildpath, conf, top_builddir, data)
     if top_builddir == '.'
         add_distclean += "\\\n $(pre_install)\\\n $(post_install)"
         [
-            'pb_auto_prepend.ph', 'pb_auto_append.ph',
+            'pb_auto_prepend.ph',
+            'pb_auto_append.ph',
             'pb_utils.ph',
-            'pb_php_compile', 'pb_cat_compile',
+            'pb_php_compile',
+            'pb_cat_compile',
+            'pb_md_to_html',
             'pb_config',
             'pb_index.cs'
         ].each do |pb|
@@ -712,6 +715,8 @@ def configure (conf)
     gen_pb_file('pb_php_compile', get_DATA(conf, 'bash'), conf, true)
 
     gen_pb_file('pb_cat_compile', get_DATA(conf, 'ruby'), conf, true)
+
+    gen_pb_file('pb_md_to_html', get_DATA(conf, 'bash'), conf, true)
 
     gen_pb_file('pb_auto_prepend.ph', get_DATA(conf, 'php').strip!, conf)
 

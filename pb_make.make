@@ -173,6 +173,8 @@ distclean_files := $(strip\
 
 php_compile := $(top_builddir)/@pb_build_prefix@pb_php_compile
 cat_compile := $(top_builddir)/@pb_build_prefix@pb_cat_compile
+md_to_html := $(top_builddir)/@pb_build_prefix@pb_md_to_html
+
 
 ifdef subdirs
 build_rec = build_rec
@@ -244,7 +246,7 @@ include $(wildcard *.d)
 
 # generic suffix rules
 %.html: %.md
-	marked $< > $@
+	$(md_to_html) $< $@
 %.php: %.pphp
 	$(php_compile) $< $@ $(url_path_dir)
 %.php: %.cphp

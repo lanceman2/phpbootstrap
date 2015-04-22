@@ -13,6 +13,7 @@ data_files =\
  pb_make.make\
  pb_php_compile\
  pb_cat_compile\
+ pb_md_to_html\
  pb_auto_prepend.ph\
  pb_auto_append.ph\
  pb_utils.ph\
