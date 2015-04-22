@@ -781,11 +781,11 @@ def usage(conf)
     # length of printed text line
     max = %x[tput cols]
     if $?.success?
-        max = max.to_i - 1
-        if max > 200
-            max = 100
-        elsif max < 30
-            max = 50
+        max = max.to_i - 5
+        if max > 90
+            max = 90
+        elsif max < 40
+            max = 40
         end
     else
         max = 80
