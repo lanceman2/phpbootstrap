@@ -41,7 +41,7 @@ case $2 in
         header="<!-- $gen_file_str -->"
         ;;
     *.ph|*.phd|*.php)
-        header="<?php /*server*/ /* $gen_file_str */\n?>"
+        header="<?php /* $gen_file_str */\n?>"
         ;;
     *.js|*.css|*.jsp|*.cs)
         header="/* $gen_file_str */"

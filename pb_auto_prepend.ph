@@ -18,7 +18,7 @@ if($pb_infile_suffix === '.pphp')
     ?><?php
 }
 
-pb_insertFile('pb_utils.ph');
+require_once('pb_utils.ph');
 
 
 /* On error, we stop the make process at compile time.

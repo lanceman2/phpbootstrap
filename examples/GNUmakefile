@@ -9,7 +9,8 @@ made_dirs = $(patsubst %/GNUmakefile,%,$(wildcard $(addsuffix /GNUmakefile,$(sub
 configure_files = $(sort $(wildcard */configure))
 installed_services = $(sort $(wildcard */pb_test_service))
 
-
+# default to debug
+CONFIGURE_OPTS=--debug=true
 
 
 

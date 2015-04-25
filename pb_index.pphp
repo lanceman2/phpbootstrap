@@ -5,6 +5,7 @@ if(@debug@ === false)
 ?><?php/*server*/
     // TODO: Add authorization method if not debug.
     header('HTTP/1.0 404 Not Found');
+    echo "HTTP/1.0 404 Not Found\n";
     exit();
 ?><?php
 }

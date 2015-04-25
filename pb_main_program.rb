@@ -279,7 +279,11 @@ begin
         f.print ",\n" if got
         got = true
         val = v.to_s
-        val = "'" + v + "'" if v.instance_of? String
+        if v.instance_of? String
+            val = "'" + v + "'"
+        else
+            val = v.to_s
+        end
         f.print "    :#{k.to_s} => #{val}"
     end
   
@@ -660,9 +664,7 @@ def get_DATA(conf, type, header = true)
     if(header)
         data =
             "#{first}" +
-            "#{pre}-------------------------------------------------#{post}\n" +
             "#{pre}#{conf[:sub][:generated_file_string]}#{post}\n" +
-            "#{pre}-------------------------------------------------#{post}\n" +
             "#{last}"
     else
         data = ''
@@ -858,9 +860,10 @@ END
 END
 
     help_printOpt($stdout, '--help|-h', 'print this help and exit', max)
-  
+
     help_printOpt($stdout, '--debug true|false',
-                'make it a debug build, i.e. not production, or not', max)
+            'make it a debug build, i.e. not production, or not.  ' +
+            'The current default is --debug '. conf[:debug].to_s, max)
 
     help_printOpt($stdout, '--prefix PREFIX',<<END, max)
 full path to where to install PUBLIC and PRIVATE docs.
@@ -936,9 +939,6 @@ def parse_args
     conf[:sub][:yui_path] = which 'yui-compressor'
     conf[:sub][:js_compile] = false
     conf[:sub][:css_compile] = false
-    # default debug value # TODO change this
-    conf[:sub][:debug] = true
-
     conf[:default_prefix] =  Dir.pwd + '/pb_test_service'
     conf[:public] = Dir.pwd + '/pb_test_service/public'
     conf[:private] = Dir.pwd + '/pb_test_service/private'
@@ -947,6 +947,15 @@ def parse_args
 
     # Get the package info into conf[:sub]
     $pb_conf.each { |k,v| conf[:sub][k] = v }
+
+
+    # default debug value
+    unless conf[:sub][:debug]
+        conf[:sub][:debug] = false
+    else
+        conf[:sub][:debug] = true
+    end
+
 
     $pb_options.each do |name,val|
          conf[:sub][name] = val[:value]
@@ -968,9 +977,9 @@ def parse_args
         elsif ret = check_arg('--debug', arg, conf)
             ret = ret.downcase
             if conf[:sub][:debug] # default is true
-                conf[:sub][:debug] = 'false' if ret =~ /(^n|^f|^0|^of)/
+                conf[:sub][:debug] = false if ret =~ /(^n|^f|^0|^of)/
             else
-                conf[:sub][:debug] = 'true' if ret =~ /(^y|^t|^[1-9]|^on|^al)/
+                conf[:sub][:debug] = true if ret =~ /(^y|^t|^[1-9]|^on|^al)/
             end
         elsif ret = check_package_option(arg, conf)
             conf[:sub][ret[0]] = ret[1]
