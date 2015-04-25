@@ -7,7 +7,7 @@ subdirs = $(filter-out GNUmakefile %_BUILD,$(wildcard *))
 rm_dirs = $(strip $(wildcard $(addsuffix /installed/,$(subdirs))) $(wildcard *_BUILD))
 made_dirs = $(patsubst %/GNUmakefile,%,$(wildcard $(addsuffix /GNUmakefile,$(subdirs))))
 configure_files = $(sort $(wildcard */configure))
-installed_services = $(sort $(wildcard */pb_service))
+installed_services = $(sort $(wildcard */pb_test_service))
 
 
 

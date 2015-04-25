@@ -244,25 +244,25 @@ include $(wildcard *.d)
 %.html: %.md
 	$(md_to_html) $< $@
 %.php: %.pphp
-	$(php_compile) $< $@ $(url_path_dir)
+	$(php_compile) $< $@
 %.php: %.cphp
 	$(cat_compile) $< $@
 %.html: %.phtml
-	$(php_compile) $< $@ $(url_path_dir)
+	$(php_compile) $< $@
 %.html: %.chtml
 	$(cat_compile) $< $@
 %.htm: %.phtm
-	$(php_compile) $< $@ $(url_path_dir)
+	$(php_compile) $< $@
 %.htm: %.chtm
 	$(cat_compile) $< $@
 %.js: %.pjs
-	$(php_compile) $< $@ $(url_path_dir)
+	$(php_compile) $< $@
 %.jsp: %.pjsp
-	$(php_compile) $< $@ $(url_path_dir)
+	$(php_compile) $< $@
 %.css: %.pcss
-	$(php_compile) $< $@ $(url_path_dir)
+	$(php_compile) $< $@
 %.cs: %.pcs
-	$(php_compile) $< $@ $(url_path_dir)
+	$(php_compile) $< $@
 %.js: %.cjs
 	$(cat_compile) $< $@
 %.jsp: %.cjsp

@@ -9,13 +9,11 @@ $pb_infilename = $_ENV['PHP_INFILENAME'];
 $pb_infile_suffix = preg_replace('/^\./', '', $pb_infilename);
 $pb_outfilename = $_ENV['PHP_OUTFILENAME'];
 $pb_outfile_suffix = preg_replace('/^\./', '', $pb_outfilename);
-$pb_public_dir = $_ENV['PHP_PUBLICDIR'];
 
 if($pb_infile_suffix === '.pphp')
 {
     ?><?php /*server*/
         $pb_debug = @debug@;
-        $pb_loaded_src_files = array();
         $pb_file_suffix = preg_replace('/^\./g', '', __FILE__);
     ?><?php
 }

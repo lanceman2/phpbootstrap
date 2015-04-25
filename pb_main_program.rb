@@ -457,8 +457,6 @@ def print_make_file(buildpath, conf, top_builddir, data)
     end
     vpath += ':' + top_builddir + '/' + conf[:sub][:pb_build_prefix].sub(/\/$/, '')
 
-    # default is not accessible by web
-    url_path_dir = '# url_path_dir is not set; this directory is not served'
 
     if buildpath =~ conf[:rel_include_dir_regrex]
         installdir = false # nothing in this dir is installed
@@ -469,11 +467,9 @@ def print_make_file(buildpath, conf, top_builddir, data)
         # installed in public and served to web
         if buildpath != '.'
             installdir = conf[:public] + '/' + buildpath
-            url_path_dir = 'url_path_dir := /' + buildpath
         else
             conf[:top_public_dir] = buildpath
             installdir = conf[:public]
-            url_path_dir = 'url_path_dir := /'
         end
         unless conf[:top_public_dir]
             conf[:top_public_dir] = buildpath
@@ -546,8 +542,6 @@ VPATH = #{vpath}
 #{srcdir_equals_builddir}
 
 #{add_distclean}
-
-#{url_path_dir}
 
     END
 
@@ -945,9 +939,9 @@ def parse_args
     # default debug value # TODO change this
     conf[:sub][:debug] = true
 
-    conf[:default_prefix] =  Dir.pwd + '/pb_service'
-    conf[:public] = Dir.pwd + '/pb_service/public'
-    conf[:private] = Dir.pwd + '/pb_service/private'
+    conf[:default_prefix] =  Dir.pwd + '/pb_test_service'
+    conf[:public] = Dir.pwd + '/pb_test_service/public'
+    conf[:private] = Dir.pwd + '/pb_test_service/private'
 
     conf[:sub][:install_user] = Etc.getpwuid(Process.uid).name
 
