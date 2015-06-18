@@ -396,21 +396,9 @@ test__subdirs_FASDiefjmzzz:
     # even with --silent, if this is run from another make process,
     # so we look for a string between @@@@ and ####.
     out = %x[#{run}]
-    subdirs = ''
-    out.each_line do |s|
-        if s =~ /@@@@.*####/
-            subdirs = s.gsub(/(^.*@@@@|####.*$)/,'')
-            break
-        end
-    end
-        
-    # error/bug check
-    if subdirs =~ /Entering directory/
-        # WTF: Is echo in the make file not run in an atomic way?
-        $stderr.print "running: #{run}\nspewed badly the following\n"
-        $stderr.print out + "\n"
-        exit 1
-    elsif not $?.success?
+    File.unlink gpath
+    # run error check
+    unless $?.success?
         # make failed
         $stderr.print <<-END
   configure failed: running:
@@ -419,8 +407,15 @@ test__subdirs_FASDiefjmzzz:
         END
         exit 1
     end
-    File.unlink gpath
     #$stderr.print 'subdirs ="' + subdirs.to_s + "\"\n"
+
+    subdirs = ''
+    out.each_line do |s|
+        if s =~ /@@@@.*####/
+            subdirs = s.gsub(/(^.*@@@@|####.*$)/,'')
+            break
+        end
+    end
 
     # make an array of sub-directories from space separated list
     subdirs.split
